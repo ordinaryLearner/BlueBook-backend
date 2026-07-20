@@ -4,11 +4,18 @@ const cors = require('cors');
 require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
+const { initDatabase, testConnection } = require('./config/database');
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// 初始化数据库
+(async () => {
+  await initDatabase();
+  await testConnection();
+})();
 
 // 路由
 app.use('/api/auth', authRoutes);
@@ -25,7 +32,7 @@ app.use((req, res) => {
 
 // 错误处理
 app.use((err, req, res, next) => {
-  console.error('错误:', err);
+  console.error('Error:', err);
   res.status(500).json({ code: 500, message: '服务器错误' });
 });
 

@@ -12,7 +12,7 @@ const generateToken = (userId) => {
 // ==================== 注册 ====================
 exports.register = async (req, res) => {
   try {
-    const { account, password, username } = req.body;
+    const { account, password } = req.body;
 
     // 验证
     if (!account || !password) {
@@ -37,6 +37,10 @@ exports.register = async (req, res) => {
         message: '该账号已被注册' 
       });
     }
+
+    // 基于当前时间生成6位随机数，昵称 = user + 6位随机数
+    const suffix = String(Date.now() % 1000000).padStart(6, '0');
+    const username = `用户${suffix}`;
 
     // 创建用户 (密码明文存储)
     const newUser = await createUser(account, password, username);

@@ -114,10 +114,24 @@ exports.login = async (req, res) => {
 // ==================== 获取当前用户 ====================
 exports.getCurrentUser = async (req, res) => {
   try {
-    const user = await findById(req.userId);
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ code: 400, message: 'Token不能为空' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({ code: 401, message: 'Token无效或已过期' });
+    }
+
+    const user = await findById(decoded.userId);
     if (!user) {
       return res.status(404).json({ code: 404, message: '用户不存在' });
     }
+
     res.json({
       code: 200,
       message: 'success',

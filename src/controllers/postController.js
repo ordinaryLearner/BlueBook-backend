@@ -1,21 +1,4 @@
-const axios = require('axios');
-const FormData = require('form-data');
 const { createPost, findAllPosts, findPostById, findRandomRecentPosts } = require('../models/post');
-
-const IMGBB_API_KEY = process.env.IMGBB_API_KEY;
-
-const uploadToImgBB = async (fileBuffer, fileName) => {
-  const formData = new FormData();
-  formData.append('image', fileBuffer, { filename: fileName || 'image.jpg' });
-
-  const response = await axios.post(
-    `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
-    formData,
-    { headers: formData.getHeaders() }
-  );
-
-  return response.data.data.url;
-};
 
 exports.createPost = async (req, res) => {
   try {
@@ -27,33 +10,21 @@ exports.createPost = async (req, res) => {
 
     const imageUrls = [];
 
-    if (req.body.imageUrls) {
-      let urls = req.body.imageUrls;
+    const collect = (field) => {
+      let urls = req.body[field];
+      if (!urls) return;
       if (typeof urls === 'string') {
         try { urls = JSON.parse(urls); } catch (e) { urls = [urls]; }
       }
       if (Array.isArray(urls)) {
-        imageUrls.push(...urls);
+        urls.forEach((u) => {
+          if (typeof u === 'string' && u.trim()) imageUrls.push(u.trim());
+        });
       }
-    }
+    };
 
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const url = await uploadToImgBB(file.buffer, file.originalname);
-        imageUrls.push(url);
-      }
-    } else if (req.body.images) {
-      let images = req.body.images;
-      if (typeof images === 'string') {
-        try { images = JSON.parse(images); } catch (e) { images = [images]; }
-      }
-      if (Array.isArray(images)) {
-        for (const img of images) {
-          const url = await uploadToImgBB(Buffer.from(img, 'base64'), 'image.jpg');
-          imageUrls.push(url);
-        }
-      }
-    }
+    collect('images');
+    collect('imageUrls');
 
     const post = await createPost(
       title || '',
@@ -71,9 +42,6 @@ exports.createPost = async (req, res) => {
     });
   } catch (error) {
     console.error('发布帖子错误:', error);
-    if (error.response) {
-      console.error('ImgBB error:', error.response.data);
-    }
     res.status(500).json({ code: 500, message: '发布失败，请稍后重试' });
   }
 };

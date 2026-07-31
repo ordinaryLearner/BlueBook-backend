@@ -294,28 +294,25 @@ Content-Type: application/json
 ```
 POST /api/posts
 Authorization: Bearer <token>
-Content-Type: multipart/form-data
+Content-Type: application/json
 ```
 
-需要登录。文本内容存入数据库，图片自动上传至 ImgBB 图床，仅存储图片 URL。
+需要登录。文本内容（title/content/sender_id）存入数据库，图片直接以 **URL 数组**的形式保存，不存储图片文件。
 
-**Request Body（multipart/form-data）：**
+**Request Body（JSON）：**
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `title` | string | 否 | 帖子标题 |
 | `content` | string | 否 | 帖子正文内容 |
-| `images` | file[] | 否 | 图片文件数组，最多 9 张，每张 ≤ 32MB |
-| `imageUrls` | string[] | 否 | 直接传入图片 URL 数组（JSON 格式），跳过 ImgBB 上传 |
-
-也支持 JSON 格式（`Content-Type: application/json`）：
+| `images` | string[] | 否 | 图片 URL 数组，直接保存到数据库，不经过任何图床上传 |
+| `imageUrls` | string[] | 否 | 同上，与 `images` 二选一或同时使用，最终合并保存 |
 
 ```json
 {
   "title": "标题",
   "content": "正文",
-  "images": ["base64编码的图片数据..."],
-  "imageUrls": ["https://example.com/image.jpg"]
+  "images": ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
 }
 ```
 
@@ -341,7 +338,7 @@ Content-Type: multipart/form-data
       {
         "id": "uuid",
         "type": "IMAGE",
-        "url": "https://i.ibb.co/xxx/image.jpg"
+        "url": "https://example.com/image1.jpg"
       }
     ],
     "likes": [],
@@ -529,22 +526,16 @@ GET /api/users/:id
 |--------|------|---------|
 | 404 | 404 | 用户不存在 |
 
-## ImgBB 图片上传服务
+## 图片存储说明
 
-本服务使用 [ImgBB](https://imgbb.com/) 作为图片存储服务，避免数据库存储过大。
+当前版本**不存储图片文件**，也不经过任何图床服务。客户端直接将图片的 URL（URI）数组随发布请求一起提交，后端只把这些 URL 原样存入 `post_medias` 表的 `url` 字段。
 
-- **API 版本：** v1
-- **上传地址：** `https://api.imgbb.com/1/upload`
-- **限制：** 单张图片 ≤ 32 MB
-- **存储方式：** 上传后仅将返回的图片 URL 存入数据库，原始图片存储在 ImgBB 服务器
-- **API Key 配置：** 在 `.env` 中设置 `IMGBB_API_KEY` 环境变量
+### Android 端图片发布流程
 
-### Android 端图片上传流程
-
-1. 用户选择图片后，在 Android 端将图片转为 **base64** 编码，或使用 **multipart/form-data** 发送图片文件
-2. 调用 `POST /api/posts` 接口，携带文本内容和图片数据
-3. 后端自动将图片上传至 ImgBB，获取 URL 后存入数据库
-4. 返回的 `medias` 字段中包含 ImgBB 返回的图片访问 URL
+1. 客户端将选中的图片转换为可访问的 URL（例如自行上传到某个图床后得到 URL，或直接使用已有的图片 URL）
+2. 调用 `POST /api/posts` 接口，请求体携带 `images: ["url1", "url2", ...]`
+3. 后端将 URL 数组直接保存到数据库
+4. 返回的 `medias` 字段中即为保存的图片 URL 列表
 
 ## 自动登录流程（前端参考）
 

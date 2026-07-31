@@ -40,6 +40,7 @@ npm start
 | `DATABASE_URL` | PostgreSQL 连接串（优先） | - |
 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 数据库独立参数（`DATABASE_URL` 为空时生效） | `localhost` / `5432` / `postgres` / 空 / `bluebook` |
 | `NODE_ENV` | 运行环境，`production` 时启用 SSL | - |
+| `IMGBB_API_KEY` | ImgBB 图床 API 密钥（用于图片上传） | `d35841f781c7eb9c8bd4f0e6f6d00b6a` |
 
 ## API 文档
 
@@ -186,14 +187,80 @@ Content-Type: application/json
 
 ---
 
-### 4. 获取当前用户（自动登录）
+### 4. 自动登录
 
 ```
-GET /api/auth/me
-Authorization: Bearer <token>
+POST /api/auth/auto_login
+Content-Type: application/json
 ```
 
-需要认证。前端可用此接口实现自动登录 —— 将登录时保存的 token 放在请求头中调用，验证通过则恢复用户会话。
+接收 `account` 和 `token`，先检索数据库确认用户存在，再验证 token 是否有效且属于该用户。
+
+**Request Body:**
+
+```json
+{
+  "account": "user123",
+  "token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `account` | string | 是 | 登录账号 |
+| `token` | string | 是 | 登录时获取的 JWT |
+
+**Response `200`:**
+
+```json
+{
+  "code": 200,
+  "message": "自动登录成功",
+  "data": {
+    "user": {
+      "id": "uuid",
+      "account": "user123",
+      "username": "张三",
+      "avatar": null,
+      "bio": null,
+      "join_time": "2024-01-01T00:00:00.000Z"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIs..."
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | 账号和Token不能为空 |
+| 401 | 401 | 用户不存在 |
+| 401 | 401 | Token无效或已过期 |
+| 401 | 401 | Token与账号不匹配 |
+
+---
+
+### 5. 获取当前用户
+
+```
+POST /api/auth/me
+Content-Type: application/json
+```
+
+仅通过 token 获取用户信息。
+
+**Request Body:**
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `token` | string | 是 | 登录时获取的 JWT |
 
 **Response `200`:**
 
@@ -216,17 +283,275 @@ Authorization: Bearer <token>
 
 | 状态码 | code | message |
 |--------|------|---------|
-| 401 | 401 | 请先登录 |
+| 400 | 400 | Token不能为空 |
 | 401 | 401 | Token无效或已过期 |
-| 401 | 401 | 用户不存在 |
 | 404 | 404 | 用户不存在 |
+
+---
+
+### 6. 发布帖子
+
+```
+POST /api/posts
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+```
+
+需要登录。文本内容存入数据库，图片自动上传至 ImgBB 图床，仅存储图片 URL。
+
+**Request Body（multipart/form-data）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `title` | string | 否 | 帖子标题 |
+| `content` | string | 否 | 帖子正文内容 |
+| `images` | file[] | 否 | 图片文件数组，最多 9 张，每张 ≤ 32MB |
+| `imageUrls` | string[] | 否 | 直接传入图片 URL 数组（JSON 格式），跳过 ImgBB 上传 |
+
+也支持 JSON 格式（`Content-Type: application/json`）：
+
+```json
+{
+  "title": "标题",
+  "content": "正文",
+  "images": ["base64编码的图片数据..."],
+  "imageUrls": ["https://example.com/image.jpg"]
+}
+```
+
+**Response `201`：**
+
+```json
+{
+  "code": 200,
+  "message": "发布成功",
+  "data": {
+    "id": "uuid",
+    "title": "标题",
+    "content": "正文",
+    "sender": {
+      "id": "uuid",
+      "username": "用户名",
+      "account": "账号",
+      "avatar": null,
+      "bio": null,
+      "join_time": "2024-01-01T00:00:00.000Z"
+    },
+    "medias": [
+      {
+        "id": "uuid",
+        "type": "IMAGE",
+        "url": "https://i.ibb.co/xxx/image.jpg"
+      }
+    ],
+    "likes": [],
+    "comments": [],
+    "created_at": "2024-01-01T00:00:00.000Z",
+    "updated_at": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 401 | 401 | 请先登录 |
+| 500 | 500 | 发布失败，请稍后重试 |
+
+---
+
+### 7. 获取帖子列表
+
+```
+GET /api/posts
+```
+
+无需登录。返回所有帖子，按创建时间倒序。
+
+**Response `200`：**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "title": "标题",
+      "content": "正文",
+      "sender": { "id": "uuid", "username": "...", "account": "...", "avatar": null, "bio": null, "join_time": "..." },
+      "medias": [{ "id": "uuid", "type": "IMAGE", "url": "https://i.ibb.co/xxx/image.jpg" }],
+      "likes": [],
+      "comments": [],
+      "created_at": "2024-01-01T00:00:00.000Z",
+      "updated_at": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### 8. 获取帖子详情
+
+```
+GET /api/posts/:id
+```
+
+无需登录。
+
+**Response `200`：** 返回单个完整帖子对象（结构与上面 data 中的元素一致）。
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 404 | 404 | 帖子不存在 |
+
+---
+
+### 9. 获取随机帖子（推荐页用）
+
+```
+GET /api/posts/random
+```
+
+无需登录。从数据库中**较新的 100 条帖子**中随机返回 10 条，适用于首页推荐等场景。
+
+**Response `200`：** `data` 为一个**数组（列表）**，最多包含 10 条完整帖子对象，例如：
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+      "title": "今天去了海边",
+      "content": "海边的日落真的很好看！",
+      "sender": {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123",
+        "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+        "bio": "热爱生活",
+        "join_time": "2024-01-01T00:00:00.000Z"
+      },
+      "medias": [
+        {
+          "id": "f1e2d3c4-b5a6-4c7e-8d9e-0f1a2b3c4d5e",
+          "type": "IMAGE",
+          "url": "https://i.ibb.co/w04Prt6/c1f64245afb2.jpg"
+        },
+        {
+          "id": "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
+          "type": "IMAGE",
+          "url": "https://i.ibb.co/98W13PY/c1f64245afb2.jpg"
+        }
+      ],
+      "likes": ["a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"],
+      "comments": [
+        {
+          "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+          "content": "拍得真好看！",
+          "time": "2024-01-01T00:00:00.000Z",
+          "sender": {
+            "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+            "username": "李四",
+            "account": "user456",
+            "avatar": null
+          },
+          "likes": 3
+        }
+      ],
+      "created_at": "2024-01-01T00:00:00.000Z",
+      "updated_at": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "6d9c4e2f-1b3a-4d8f-a7e0-2b3c4d5e6f7a",
+      "title": "分享一首歌",
+      "content": "推荐大家听听这首新歌",
+      "sender": {
+        "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        "username": "李四",
+        "account": "user456",
+        "avatar": null,
+        "bio": null,
+        "join_time": "2024-01-02T00:00:00.000Z"
+      },
+      "medias": [],
+      "likes": [],
+      "comments": [],
+      "created_at": "2024-01-02T00:00:00.000Z",
+      "updated_at": "2024-01-02T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+说明：
+
+- `data` 是 **JSON 数组**，长度 ≤ 10（数据库中较新帖子不足 10 条时按实际数量返回）
+- 每条帖子的结构完全相同，Android 端可解析为 `List<Post>`
+- `sender` 为完整的用户信息对象；`medias` 为图片列表（可为空数组）；`likes` 为用户 ID 数组；`comments` 为评论列表（可为空数组）
+
+---
+
+### 10. 获取用户信息
+
+```
+GET /api/users/:id
+```
+
+无需登录。根据用户 ID 查询用户基本信息，可用于从帖子 `sender.id` 获取发送者的详细信息。
+
+**Response `200`：**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": "uuid",
+    "account": "user123",
+    "username": "张三",
+    "avatar": null,
+    "bio": null,
+    "join_time": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 404 | 404 | 用户不存在 |
+
+## ImgBB 图片上传服务
+
+本服务使用 [ImgBB](https://imgbb.com/) 作为图片存储服务，避免数据库存储过大。
+
+- **API 版本：** v1
+- **上传地址：** `https://api.imgbb.com/1/upload`
+- **限制：** 单张图片 ≤ 32 MB
+- **存储方式：** 上传后仅将返回的图片 URL 存入数据库，原始图片存储在 ImgBB 服务器
+- **API Key 配置：** 在 `.env` 中设置 `IMGBB_API_KEY` 环境变量
+
+### Android 端图片上传流程
+
+1. 用户选择图片后，在 Android 端将图片转为 **base64** 编码，或使用 **multipart/form-data** 发送图片文件
+2. 调用 `POST /api/posts` 接口，携带文本内容和图片数据
+3. 后端自动将图片上传至 ImgBB，获取 URL 后存入数据库
+4. 返回的 `medias` 字段中包含 ImgBB 返回的图片访问 URL
 
 ## 自动登录流程（前端参考）
 
 1. 用户首次登录，调用 `POST /api/auth/login`，获取 `token` 并保存到本地（如 localStorage）。
-2. 每次 App 启动时，从本地取出 `token`，调用 `GET /api/auth/me`（携带 `Authorization: Bearer <token>`）。
-3. 若接口返回 200，表示 token 有效，用户自动登录成功。
-4. 若返回 401，表示 token 无效或已过期，跳转到登录页。
+2. 每次 App 启动时，从本地取出 `token` 和 `account`，调用 `POST /api/auth/auto_login`（请求体携带 `{ "account": "<account>", "token": "<token>" }`）。
+3. 若接口返回 200，表示 token 有效且账号匹配，自动登录成功。
+4. 若返回 401，表示 token 无效、过期或账号不匹配，跳转到登录页。
 
 Token 有效期：**7 天**，过期后需重新登录。
 
@@ -243,5 +568,32 @@ CREATE TABLE users (
   join_time  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE posts (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title      VARCHAR(255) NOT NULL DEFAULT '',
+  content    TEXT NOT NULL DEFAULT '',
+  sender_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  likes      JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE post_medias (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  type       VARCHAR(10) NOT NULL DEFAULT 'IMAGE',
+  url        TEXT NOT NULL,
+  sort_order INT DEFAULT 0
+);
+
+CREATE TABLE comments (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  content    TEXT NOT NULL,
+  sender_id  UUID NOT NULL REFERENCES users(id),
+  likes      INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```

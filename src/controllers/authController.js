@@ -111,6 +111,63 @@ exports.login = async (req, res) => {
   }
 };
 
+// ==================== 自动登录 ====================
+exports.autoLogin = async (req, res) => {
+  try {
+    const { account, token } = req.body;
+
+    if (!account || !token) {
+      return res.status(400).json({ 
+        code: 400, 
+        message: '账号和Token不能为空' 
+      });
+    }
+
+    // 查找用户
+    const user = await findByAccount(account);
+    if (!user) {
+      return res.status(401).json({ 
+        code: 401, 
+        message: '用户不存在' 
+      });
+    }
+
+    // 验证 Token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({ 
+        code: 401, 
+        message: 'Token无效或已过期' 
+      });
+    }
+
+    // 检查 Token 中的 userId 是否与当前账号匹配
+    if (decoded.userId !== user.id) {
+      return res.status(401).json({ 
+        code: 401, 
+        message: 'Token与账号不匹配' 
+      });
+    }
+
+    // 返回用户信息 (不包含密码)
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.json({
+      code: 200,
+      message: '自动登录成功',
+      data: {
+        user: userWithoutPassword,
+        token
+      }
+    });
+  } catch (error) {
+    console.error('自动登录错误:', error);
+    res.status(500).json({ code: 500, message: '自动登录失败，请稍后重试' });
+  }
+};
+
 // ==================== 获取当前用户 ====================
 exports.getCurrentUser = async (req, res) => {
   try {

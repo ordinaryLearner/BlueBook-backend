@@ -21,23 +21,57 @@ if (!process.env.DATABASE_URL) {
   pool.options.ssl = false;
 }
 
-// 创建 users 表
+// 初始化所有表
 const initDatabase = async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        account VARCHAR(100) UNIQUE NOT NULL,
-        password VARCHAR(255) NOT NULL,
-        username VARCHAR(100),
-        avatar TEXT,
-        bio TEXT,
-        join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        account    VARCHAR(100) UNIQUE NOT NULL,
+        password   VARCHAR(255) NOT NULL,
+        username   VARCHAR(100),
+        avatar     TEXT,
+        bio        TEXT,
+        join_time  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('Database table initialized successfully');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS posts (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title      VARCHAR(255) NOT NULL DEFAULT '',
+        content    TEXT NOT NULL DEFAULT '',
+        sender_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        likes      JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS post_medias (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        type       VARCHAR(10) NOT NULL DEFAULT 'IMAGE',
+        url        TEXT NOT NULL,
+        sort_order INT DEFAULT 0
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS comments (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        content    TEXT NOT NULL,
+        sender_id  UUID NOT NULL REFERENCES users(id),
+        likes      INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    console.log('Database tables initialized successfully');
   } catch (error) {
     console.error('Database initialization failed:', error.message);
   }

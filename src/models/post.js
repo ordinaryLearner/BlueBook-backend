@@ -105,6 +105,51 @@ const findPostById = async (id) => {
   return post;
 };
 
+const findPostsByUserId = async (userId) => {
+  const result = await pool.query(`
+    SELECT p.*,
+      json_build_object(
+        'id', u.id,
+        'username', u.username,
+        'account', u.account,
+        'avatar', u.avatar,
+        'bio', u.bio,
+        'join_time', u.join_time
+      ) as sender
+    FROM posts p
+    JOIN users u ON p.sender_id = u.id
+    WHERE p.sender_id = $1
+    ORDER BY p.created_at DESC
+  `, [userId]);
+
+  const posts = result.rows;
+
+  for (const post of posts) {
+    const mediasResult = await pool.query(
+      'SELECT id, type, url FROM post_medias WHERE post_id = $1 ORDER BY sort_order',
+      [post.id]
+    );
+    post.medias = mediasResult.rows;
+
+    const commentsResult = await pool.query(`
+      SELECT c.*,
+        json_build_object(
+          'id', u.id,
+          'username', u.username,
+          'account', u.account,
+          'avatar', u.avatar
+        ) as sender
+      FROM comments c
+      JOIN users u ON c.sender_id = u.id
+      WHERE c.post_id = $1
+      ORDER BY c.created_at ASC
+    `, [post.id]);
+    post.comments = commentsResult.rows;
+  }
+
+  return posts;
+};
+
 const findRandomRecentPosts = async (limit = 10) => {
   const result = await pool.query(`
     SELECT p.*,
@@ -152,4 +197,4 @@ const findRandomRecentPosts = async (limit = 10) => {
   return posts;
 };
 
-module.exports = { createPost, findAllPosts, findPostById, findRandomRecentPosts };
+module.exports = { createPost, findAllPosts, findPostById, findPostsByUserId, findRandomRecentPosts };

@@ -495,7 +495,48 @@ GET /api/posts/random
 
 ---
 
-### 10. 获取用户信息
+### 10. 获取当前用户的帖子
+
+```
+GET /api/posts/my
+```
+
+**需要登录**，请求头携带 `Authorization: Bearer <token>`。返回当前登录用户发布的所有帖子，按发布时间倒序排列，结构与 `GET /api/posts/random` 完全相同（`data` 为帖子数组，可能为空数组）。
+
+**Response `200`：**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+      "title": "今天去了海边",
+      "content": "海边的日落真的很好看！",
+      "sender": {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123",
+        "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+        "bio": "热爱生活",
+        "join_time": "2024-01-01T00:00:00.000Z"
+      },
+      "medias": [],
+      "likes": [],
+      "comments": [],
+      "created_at": "2024-01-01T00:00:00.000Z",
+      "updated_at": "2024-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+说明：`token` 无效或缺失时返回 `401`。
+
+---
+
+### 11. 获取用户信息
 
 ```
 GET /api/users/:id

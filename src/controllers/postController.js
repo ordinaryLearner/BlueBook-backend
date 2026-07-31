@@ -1,4 +1,4 @@
-const { createPost, findAllPosts, findPostById, findRandomRecentPosts } = require('../models/post');
+const { createPost, findAllPosts, findPostById, findPostsByUserId, findRandomRecentPosts } = require('../models/post');
 
 exports.createPost = async (req, res) => {
   try {
@@ -57,6 +57,20 @@ exports.getPosts = async (req, res) => {
   } catch (error) {
     console.error('获取帖子列表错误:', error);
     res.status(500).json({ code: 500, message: '获取帖子列表失败' });
+  }
+};
+
+exports.getMyPosts = async (req, res) => {
+  try {
+    const posts = await findPostsByUserId(req.userId);
+    res.json({
+      code: 200,
+      message: 'success',
+      data: posts
+    });
+  } catch (error) {
+    console.error('获取我的帖子错误:', error);
+    res.status(500).json({ code: 500, message: '获取我的帖子失败' });
   }
 };
 

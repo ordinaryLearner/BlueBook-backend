@@ -64,11 +64,18 @@ const initDatabase = async () => {
       CREATE TABLE IF NOT EXISTS comments (
         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        parent_id  UUID REFERENCES comments(id) ON DELETE CASCADE,
         content    TEXT NOT NULL,
         sender_id  UUID NOT NULL REFERENCES users(id),
         likes      INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // 兼容已存在的表：幂等补充 parent_id 列，用于支持回复（嵌套评论）
+    await pool.query(`
+      ALTER TABLE comments
+      ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES comments(id) ON DELETE CASCADE
     `);
 
     console.log('Database tables initialized successfully');

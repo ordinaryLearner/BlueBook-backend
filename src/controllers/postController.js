@@ -1,4 +1,4 @@
-const { createPost, findAllPosts, findPostById, findPostsByUserId, findRandomRecentPosts } = require('../models/post');
+const { createPost, findAllPosts, findPostById, findPostsByUserId, findRandomRecentPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
 
 exports.createPost = async (req, res) => {
   try {
@@ -102,5 +102,56 @@ exports.getPostById = async (req, res) => {
   } catch (error) {
     console.error('获取帖子详情错误:', error);
     res.status(500).json({ code: 500, message: '获取帖子详情失败' });
+  }
+};
+
+exports.createComment = async (req, res) => {
+  try {
+    const { senderId, commentType, receiverId, postId, content, parentId } = req.body;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ code: 400, message: '评论内容不能为空' });
+    }
+
+    if (!postId) {
+      return res.status(400).json({ code: 400, message: '帖子ID不能为空' });
+    }
+
+    const post = await findPostById(postId);
+    if (!post) {
+      return res.status(404).json({ code: 404, message: '帖子不存在' });
+    }
+
+    const isReply = commentType === 'REPLYCOMMENT' || (commentType === undefined && parentId);
+    const targetParentId = isReply ? (receiverId || parentId) : null;
+
+    if (isReply && !targetParentId) {
+      return res.status(400).json({ code: 400, message: '回复的评论不能为空' });
+    }
+
+    if (targetParentId) {
+      const parent = await findCommentById(targetParentId);
+      if (!parent || parent.post_id !== postId) {
+        return res.status(400).json({ code: 400, message: '回复的评论不存在' });
+      }
+    }
+
+    const comment = await createComment({
+      postId,
+      content: content.trim(),
+      senderId: req.userId,
+      parentId: targetParentId || null
+    });
+
+    const fullComment = await findFullCommentById(comment.id);
+
+    res.status(201).json({
+      code: 200,
+      message: '评论成功',
+      data: fullComment
+    });
+  } catch (error) {
+    console.error('发布评论错误:', error);
+    res.status(500).json({ code: 500, message: '评论失败，请稍后重试' });
   }
 };

@@ -366,7 +366,7 @@ GET /api/posts
 
 无需登录。返回所有帖子，按创建时间倒序。
 
-**Response `200`：**
+**Response `200`：** 每条帖子的 `comments` 为**嵌套评论树**，按时间正序排列——每条评论的 `comments` 字段存放其下所有回复，根评论无 `parentId` 字段。
 
 ```json
 {
@@ -374,13 +374,56 @@ GET /api/posts
   "message": "success",
   "data": [
     {
-      "id": "uuid",
-      "title": "标题",
-      "content": "正文",
-      "sender": { "id": "uuid", "username": "...", "account": "...", "avatar": null, "bio": null, "join_time": "..." },
-      "medias": [{ "id": "uuid", "type": "IMAGE", "url": "https://i.ibb.co/xxx/image.jpg" }],
-      "likes": [],
-      "comments": [],
+      "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+      "title": "今天去了海边",
+      "content": "海边的日落真的很好看！",
+      "sender": {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123",
+        "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+        "bio": "热爱生活",
+        "join_time": "2024-01-01T00:00:00.000Z"
+      },
+      "medias": [
+        {
+          "id": "f1e2d3c4-b5a6-4c7e-8d9e-0f1a2b3c4d5e",
+          "type": "IMAGE",
+          "url": "https://i.ibb.co/w04Prt6/c1f64245afb2.jpg"
+        }
+      ],
+      "likes": ["a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"],
+      "comments": [
+        {
+          "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+          "content": "拍得真好看！",
+          "time": "2024-01-01T00:00:00.000Z",
+          "type": "POSTCOMMENT",
+          "sender": {
+            "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+            "username": "李四",
+            "account": "user456",
+            "avatar": null
+          },
+          "likes": 3,
+          "comments": [
+            {
+              "id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f7a",
+              "content": "谢谢～",
+              "time": "2024-01-01T01:00:00.000Z",
+              "type": "REPLYCOMMENT",
+              "sender": {
+                "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+                "username": "张三",
+                "account": "user123",
+                "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+              },
+              "likes": 1,
+              "comments": []
+            }
+          ]
+        }
+      ],
       "created_at": "2024-01-01T00:00:00.000Z",
       "updated_at": "2024-01-01T00:00:00.000Z"
     }
@@ -398,7 +441,80 @@ GET /api/posts/:id
 
 无需登录。
 
-**Response `200`：** 返回单个完整帖子对象（结构与上面 data 中的元素一致）。
+**Response `200`：** 返回单个完整帖子对象（结构与上面 data 中的元素一致），其 `comments` 同样为嵌套评论树，示例：
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+    "title": "今天去了海边",
+    "content": "海边的日落真的很好看！",
+    "sender": {
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "username": "张三",
+      "account": "user123",
+      "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+      "bio": "热爱生活",
+      "join_time": "2024-01-01T00:00:00.000Z"
+    },
+    "medias": [
+      {
+        "id": "f1e2d3c4-b5a6-4c7e-8d9e-0f1a2b3c4d5e",
+        "type": "IMAGE",
+        "url": "https://i.ibb.co/w04Prt6/c1f64245afb2.jpg"
+      }
+    ],
+    "likes": ["a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"],
+    "comments": [
+      {
+        "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+        "content": "拍得真好看！",
+        "time": "2024-01-01T00:00:00.000Z",
+        "type": "POSTCOMMENT",
+        "sender": {
+          "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+          "username": "李四",
+          "account": "user456",
+          "avatar": null
+        },
+        "likes": 3,
+        "comments": [
+          {
+            "id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f7a",
+            "content": "谢谢～",
+            "time": "2024-01-01T01:00:00.000Z",
+            "type": "REPLYCOMMENT",
+            "sender": {
+              "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+              "username": "张三",
+              "account": "user123",
+              "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+            },
+            "likes": 1,
+            "comments": []
+          }
+        ]
+      }
+    ],
+    "created_at": "2024-01-01T00:00:00.000Z",
+    "updated_at": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
+**Comment 字段说明：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string | 评论 ID |
+| `content` | string | 评论内容 |
+| `time` | string | 评论时间 |
+| `type` | string | 评论类型：`POSTCOMMENT`（评论帖子）/ `REPLYCOMMENT`（回复评论） |
+| `sender` | object | 评论者信息（`id` / `username` / `account` / `avatar`） |
+| `likes` | int | 点赞数 |
+| `comments` | array | 该评论下的回复（嵌套评论树，可能为空数组） |
 
 **错误码：**
 
@@ -453,13 +569,15 @@ GET /api/posts/random
           "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
           "content": "拍得真好看！",
           "time": "2024-01-01T00:00:00.000Z",
+          "type": "POSTCOMMENT",
           "sender": {
             "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
             "username": "李四",
             "account": "user456",
             "avatar": null
           },
-          "likes": 3
+          "likes": 3,
+          "comments": []
         }
       ],
       "created_at": "2024-01-01T00:00:00.000Z",
@@ -567,6 +685,88 @@ GET /api/users/:id
 |--------|------|---------|
 | 404 | 404 | 用户不存在 |
 
+---
+
+### 12. 发表评论 / 回复
+
+```
+POST /api/comments
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+需要登录。为指定帖子添加一条评论；`commentType` 为 `REPLYCOMMENT` 时则为对某条评论的**回复（嵌套评论）**。评论结构对应客户端 `data class Comment(id, content, time, type, sender, likes, comments)`。
+
+**Request Body（JSON）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `senderId` | string | 是 | 评论者用户 ID（服务端以登录 token 中的用户为准） |
+| `commentType` | string | 是 | 评论类型：`POSTCOMMENT`（评论帖子）/ `REPLYCOMMENT`（回复评论） |
+| `receiverId` | string | 否 | 被回复的评论 ID（`commentType` 为 `REPLYCOMMENT` 时必填），必须属于同一帖子 |
+| `postId` | string | 是 | 被评论的帖子 ID |
+| `content` | string | 是 | 评论内容，不能为空 |
+
+评论帖子示例：
+
+```json
+{
+  "senderId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "commentType": "POSTCOMMENT",
+  "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+  "content": "拍得真好看！"
+}
+```
+
+回复评论示例（`commentType` 为 `REPLYCOMMENT`）：
+
+```json
+{
+  "senderId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "commentType": "REPLYCOMMENT",
+  "receiverId": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+  "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+  "content": "谢谢～"
+}
+```
+
+**Response `201`：**
+
+```json
+{
+  "code": 200,
+  "message": "评论成功",
+  "data": {
+    "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+    "content": "拍得真好看！",
+    "time": "2024-01-01T00:00:00.000Z",
+    "type": "POSTCOMMENT",
+    "sender": {
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "username": "李四",
+      "account": "user456",
+      "avatar": null
+    },
+    "likes": 0,
+    "comments": []
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 400 | 400 | 评论内容不能为空 |
+| 400 | 400 | 帖子ID不能为空 |
+| 400 | 400 | 回复的评论不能为空 |
+| 400 | 400 | 回复的评论不存在 |
+| 404 | 404 | 帖子不存在 |
+| 500 | 500 | 评论失败，请稍后重试 |
+
+**说明：** 评论成功后可调用 `GET /api/posts/:id` 重新拉取帖子详情，其中 `comments` 为按时间正序的**嵌套评论树**——每条评论的 `comments` 字段存放其下所有回复，根评论（`POSTCOMMENT`）无 `parentId`。客户端 `Comment` 模型中的 `type` 对应服务端返回的 `type` 字段：根评论为 `POSTCOMMENT`，回复为 `REPLYCOMMENT`；`comments` 缺省为空列表。`senderId` 仅作请求参数，实际评论归属以登录 token 认证的用户为准。
+
 ## 图片存储说明
 
 当前版本**不存储图片文件**，也不经过任何图床服务。客户端直接将图片的 URL（URI）数组随发布请求一起提交，后端只把这些 URL 原样存入 `post_medias` 表的 `url` 字段。
@@ -623,6 +823,7 @@ CREATE TABLE post_medias (
 CREATE TABLE comments (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  parent_id  UUID REFERENCES comments(id) ON DELETE CASCADE,
   content    TEXT NOT NULL,
   sender_id  UUID NOT NULL REFERENCES users(id),
   likes      INT DEFAULT 0,

@@ -1,4 +1,16 @@
 const { pool } = require('../config/database');
+const { formatTime } = require('../utils/time');
+
+const formatPost = (post) => {
+  if (!post) return null;
+  if (post.created_at) {
+    post.time = post.time || formatTime(post.created_at);
+    post.created_at = formatTime(post.created_at);
+  }
+  if (post.updated_at) post.updated_at = formatTime(post.updated_at);
+  if (post.sender && post.sender.join_time) post.sender.join_time = formatTime(post.sender.join_time);
+  return post;
+};
 
 const createPost = async (title, content, senderId, imageUrls) => {
   const postResult = await pool.query(
@@ -33,7 +45,7 @@ const buildCommentTree = (rows) => {
     const node = {
       id: row.id,
       content: row.content,
-      time: row.created_at,
+      time: formatTime(row.created_at),
       type: row.parent_id ? 'REPLYCOMMENT' : 'POSTCOMMENT',
       sender: row.sender,
       likes: row.likes,
@@ -82,6 +94,7 @@ const attachCommentsToPosts = async (posts) => {
   for (const post of posts) {
     post.medias = await findMediasByPostId(post.id);
     post.comments = await findCommentsByPostId(post.id);
+    formatPost(post);
   }
   return posts;
 };
@@ -127,7 +140,7 @@ const findPostById = async (id) => {
   post.medias = await findMediasByPostId(post.id);
   post.comments = await findCommentsByPostId(post.id);
 
-  return post;
+  return formatPost(post);
 };
 
 const findPostsByUserId = async (userId) => {
@@ -207,7 +220,7 @@ const findFullCommentById = async (id) => {
   return {
     id: row.id,
     content: row.content,
-    time: row.created_at,
+    time: formatTime(row.created_at),
     type: row.parent_id ? 'REPLYCOMMENT' : 'POSTCOMMENT',
     sender: row.sender,
     likes: row.likes,

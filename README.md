@@ -54,6 +54,8 @@ npm start
 }
 ```
 
+**时间格式：** 帖子、评论、用户等数据中的时间字段（`created_at` / `updated_at` / `join_time` / `time`）统一为固定格式 `yyyy-MM-dd HH:mm:ss`（如 `2024-01-01 12:00:00`），由服务端在写入数据时记录并格式化返回。仅 `/health` 返回 ISO 8601 时间戳。
+
 错误时返回（示例）：
 
 ```json
@@ -78,7 +80,7 @@ GET /health
 ```json
 {
   "status": "ok",
-  "timestamp": "2024-01-01T00:00:00.000Z"
+  "timestamp": "2024-08-17T12:34:56.789Z"
 }
 ```
 
@@ -120,7 +122,7 @@ Content-Type: application/json
       "username": "用户847251",
       "avatar": null,
       "bio": null,
-      "join_time": "2024-01-01T00:00:00.000Z"
+      "join_time": "2024-01-01 00:00:00"
     },
     "token": "eyJhbGciOiJIUzI1NiIs..."
   }
@@ -171,7 +173,7 @@ Content-Type: application/json
       "username": "张三",
       "avatar": null,
       "bio": null,
-      "join_time": "2024-01-01T00:00:00.000Z"
+      "join_time": "2024-01-01 00:00:00"
     },
     "token": "eyJhbGciOiJIUzI1NiIs..."
   }
@@ -223,7 +225,7 @@ Content-Type: application/json
       "username": "张三",
       "avatar": null,
       "bio": null,
-      "join_time": "2024-01-01T00:00:00.000Z"
+      "join_time": "2024-01-01 00:00:00"
     },
     "token": "eyJhbGciOiJIUzI1NiIs..."
   }
@@ -274,7 +276,7 @@ Content-Type: application/json
     "username": "张三",
     "avatar": null,
     "bio": null,
-    "join_time": "2024-01-01T00:00:00.000Z"
+    "join_time": "2024-01-01 00:00:00"
   }
 }
 ```
@@ -332,7 +334,7 @@ Content-Type: application/json
       "account": "账号",
       "avatar": null,
       "bio": null,
-      "join_time": "2024-01-01T00:00:00.000Z"
+      "join_time": "2024-01-01 00:00:00"
     },
     "medias": [
       {
@@ -343,8 +345,9 @@ Content-Type: application/json
     ],
     "likes": [],
     "comments": [],
-    "created_at": "2024-01-01T00:00:00.000Z",
-    "updated_at": "2024-01-01T00:00:00.000Z"
+    "time": "2024-01-01 00:00:00",
+    "created_at": "2024-01-01 00:00:00",
+    "updated_at": "2024-01-01 00:00:00"
   }
 }
 ```
@@ -383,7 +386,7 @@ GET /api/posts
         "account": "user123",
         "avatar": "https://i.ibb.co/xxx/avatar.jpg",
         "bio": "热爱生活",
-        "join_time": "2024-01-01T00:00:00.000Z"
+        "join_time": "2024-01-01 00:00:00"
       },
       "medias": [
         {
@@ -397,7 +400,7 @@ GET /api/posts
         {
           "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
           "content": "拍得真好看！",
-          "time": "2024-01-01T00:00:00.000Z",
+          "time": "2024-01-01 00:00:00",
           "type": "POSTCOMMENT",
           "sender": {
             "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
@@ -410,7 +413,7 @@ GET /api/posts
             {
               "id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f7a",
               "content": "谢谢～",
-              "time": "2024-01-01T01:00:00.000Z",
+              "time": "2024-01-01 01:00:00",
               "type": "REPLYCOMMENT",
               "sender": {
                 "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
@@ -424,8 +427,9 @@ GET /api/posts
           ]
         }
       ],
-      "created_at": "2024-01-01T00:00:00.000Z",
-      "updated_at": "2024-01-01T00:00:00.000Z"
+      "time": "2024-01-01 00:00:00",
+      "created_at": "2024-01-01 00:00:00",
+      "updated_at": "2024-01-01 00:00:00"
     }
   ]
 }
@@ -457,7 +461,7 @@ GET /api/posts/:id
       "account": "user123",
       "avatar": "https://i.ibb.co/xxx/avatar.jpg",
       "bio": "热爱生活",
-      "join_time": "2024-01-01T00:00:00.000Z"
+      "join_time": "2024-01-01 00:00:00"
     },
     "medias": [
       {
@@ -471,7 +475,7 @@ GET /api/posts/:id
       {
         "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
         "content": "拍得真好看！",
-        "time": "2024-01-01T00:00:00.000Z",
+        "time": "2024-01-01 00:00:00",
         "type": "POSTCOMMENT",
         "sender": {
           "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
@@ -484,7 +488,7 @@ GET /api/posts/:id
           {
             "id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f7a",
             "content": "谢谢～",
-            "time": "2024-01-01T01:00:00.000Z",
+            "time": "2024-01-01 01:00:00",
             "type": "REPLYCOMMENT",
             "sender": {
               "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
@@ -498,8 +502,9 @@ GET /api/posts/:id
         ]
       }
     ],
-    "created_at": "2024-01-01T00:00:00.000Z",
-    "updated_at": "2024-01-01T00:00:00.000Z"
+    "time": "2024-01-01 00:00:00",
+    "created_at": "2024-01-01 00:00:00",
+    "updated_at": "2024-01-01 00:00:00"
   }
 }
 ```
@@ -549,7 +554,7 @@ GET /api/posts/random
         "account": "user123",
         "avatar": "https://i.ibb.co/xxx/avatar.jpg",
         "bio": "热爱生活",
-        "join_time": "2024-01-01T00:00:00.000Z"
+        "join_time": "2024-01-01 00:00:00"
       },
       "medias": [
         {
@@ -568,7 +573,7 @@ GET /api/posts/random
         {
           "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
           "content": "拍得真好看！",
-          "time": "2024-01-01T00:00:00.000Z",
+          "time": "2024-01-01 00:00:00",
           "type": "POSTCOMMENT",
           "sender": {
             "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
@@ -580,8 +585,9 @@ GET /api/posts/random
           "comments": []
         }
       ],
-      "created_at": "2024-01-01T00:00:00.000Z",
-      "updated_at": "2024-01-01T00:00:00.000Z"
+      "time": "2024-01-01 00:00:00",
+      "created_at": "2024-01-01 00:00:00",
+      "updated_at": "2024-01-01 00:00:00"
     },
     {
       "id": "6d9c4e2f-1b3a-4d8f-a7e0-2b3c4d5e6f7a",
@@ -593,13 +599,14 @@ GET /api/posts/random
         "account": "user456",
         "avatar": null,
         "bio": null,
-        "join_time": "2024-01-02T00:00:00.000Z"
+        "join_time": "2024-01-02 00:00:00"
       },
       "medias": [],
       "likes": [],
       "comments": [],
-      "created_at": "2024-01-02T00:00:00.000Z",
-      "updated_at": "2024-01-02T00:00:00.000Z"
+      "time": "2024-01-02 00:00:00",
+      "created_at": "2024-01-02 00:00:00",
+      "updated_at": "2024-01-02 00:00:00"
     }
   ]
 }
@@ -638,13 +645,14 @@ GET /api/posts/my
         "account": "user123",
         "avatar": "https://i.ibb.co/xxx/avatar.jpg",
         "bio": "热爱生活",
-        "join_time": "2024-01-01T00:00:00.000Z"
+        "join_time": "2024-01-01 00:00:00"
       },
       "medias": [],
       "likes": [],
       "comments": [],
-      "created_at": "2024-01-01T00:00:00.000Z",
-      "updated_at": "2024-01-01T00:00:00.000Z"
+      "time": "2024-01-01 00:00:00",
+      "created_at": "2024-01-01 00:00:00",
+      "updated_at": "2024-01-01 00:00:00"
     }
   ]
 }
@@ -674,7 +682,7 @@ GET /api/users/:id
     "username": "张三",
     "avatar": null,
     "bio": null,
-    "join_time": "2024-01-01T00:00:00.000Z"
+    "join_time": "2024-01-01 00:00:00"
   }
 }
 ```
@@ -739,7 +747,7 @@ Content-Type: application/json
   "data": {
     "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
     "content": "拍得真好看！",
-    "time": "2024-01-01T00:00:00.000Z",
+    "time": "2024-01-01 00:00:00",
     "type": "POSTCOMMENT",
     "sender": {
       "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",

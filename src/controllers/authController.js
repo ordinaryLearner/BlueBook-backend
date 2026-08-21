@@ -77,9 +77,9 @@ exports.login = async (req, res) => {
     // 查找用户
     const user = await findByAccount(account);
     if (!user) {
-      return res.status(401).json({ 
-        code: 401, 
-        message: '账号或密码错误' 
+      return res.status(404).json({ 
+        code: 404, 
+        message: '用户不存在' 
       });
     }
 

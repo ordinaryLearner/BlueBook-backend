@@ -1,4 +1,5 @@
 const { createPost, findAllPosts, findPostById, findPostsByUserId, findRandomRecentPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
+const { findById } = require('../models/user');
 
 exports.createPost = async (req, res) => {
   try {
@@ -107,7 +108,7 @@ exports.getPostById = async (req, res) => {
 
 exports.createComment = async (req, res) => {
   try {
-    const { senderId, commentType, receiverId, postId, content, parentId } = req.body;
+    const { commentType, receiverId, commentId, postId, content } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ code: 400, message: '评论内容不能为空' });
@@ -122,25 +123,37 @@ exports.createComment = async (req, res) => {
       return res.status(404).json({ code: 404, message: '帖子不存在' });
     }
 
-    const isReply = commentType === 'REPLYCOMMENT' || (commentType === undefined && parentId);
-    const targetParentId = isReply ? (receiverId || parentId) : null;
+    let parentId = null;
+    let receiver = null;
 
-    if (isReply && !targetParentId) {
-      return res.status(400).json({ code: 400, message: '回复的评论不能为空' });
-    }
+    if (commentType === 'REPLYCOMMENT') {
+      // 回复评论：commentId 为被回复的评论 ID（作为父评论），receiverId 为被回复者（用户）ID
+      if (!commentId) {
+        return res.status(400).json({ code: 400, message: '回复的评论ID(commentId)不能为空' });
+      }
+      if (!receiverId) {
+        return res.status(400).json({ code: 400, message: '被回复者ID(receiverId)不能为空' });
+      }
 
-    if (targetParentId) {
-      const parent = await findCommentById(targetParentId);
+      const parent = await findCommentById(commentId);
       if (!parent || parent.post_id !== postId) {
         return res.status(400).json({ code: 400, message: '回复的评论不存在' });
       }
+
+      receiver = await findById(receiverId);
+      if (!receiver) {
+        return res.status(400).json({ code: 400, message: '被回复的用户不存在' });
+      }
+
+      parentId = commentId;
     }
 
     const comment = await createComment({
       postId,
       content: content.trim(),
       senderId: req.userId,
-      parentId: targetParentId || null
+      parentId,
+      receiverId: receiver ? receiver.id : null
     });
 
     const fullComment = await findFullCommentById(comment.id);

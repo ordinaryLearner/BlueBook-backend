@@ -1,13 +1,7 @@
 ﻿// src/controllers/authController.js
 const jwt = require('jsonwebtoken');
 const { findByAccount, createUser, findById } = require('../models/user');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'bluebook-super-secret-key-2024';
-
-// 生成 Token
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
-};
+const { generateToken, JWT_SECRET } = require('../utils/token');
 
 // ==================== 注册 ====================
 exports.register = async (req, res) => {

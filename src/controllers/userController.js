@@ -1,4 +1,5 @@
 const { findById, updateProfile } = require('../models/user');
+const { generateToken } = require('../utils/token');
 
 exports.getUserById = async (req, res) => {
   try {
@@ -50,7 +51,10 @@ exports.updateProfile = async (req, res) => {
     res.json({
       code: 200,
       message: '更新成功',
-      data: updatedUser
+      data: {
+        user: updatedUser,
+        token: generateToken(updatedUser.id)
+      }
     });
   } catch (error) {
     console.error('更新个人资料错误:', error);

@@ -63,13 +63,14 @@ const initDatabase = async () => {
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS comments (
-        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-        parent_id  UUID REFERENCES comments(id) ON DELETE CASCADE,
-        content    TEXT NOT NULL,
-        sender_id  UUID NOT NULL REFERENCES users(id),
-        likes      INT DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        post_id     UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+        parent_id   UUID REFERENCES comments(id) ON DELETE CASCADE,
+        receiver_id UUID REFERENCES users(id),
+        content     TEXT NOT NULL,
+        sender_id   UUID NOT NULL REFERENCES users(id),
+        likes       INT DEFAULT 0,
+        created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -77,6 +78,12 @@ const initDatabase = async () => {
     await pool.query(`
       ALTER TABLE comments
       ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES comments(id) ON DELETE CASCADE
+    `);
+
+    // 兼容已存在的表：幂等补充 receiver_id 列，用于记录回复中被回复的用户
+    await pool.query(`
+      ALTER TABLE comments
+      ADD COLUMN IF NOT EXISTS receiver_id UUID REFERENCES users(id)
     `);
 
     console.log('Database tables initialized successfully');

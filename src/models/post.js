@@ -48,6 +48,7 @@ const buildCommentTree = (rows) => {
       time: formatTime(row.created_at),
       type: row.parent_id ? 'REPLYCOMMENT' : 'POSTCOMMENT',
       sender: row.sender,
+      receiver: row.receiver || null,
       likes: row.likes,
       comments: []
     };
@@ -80,9 +81,16 @@ const findCommentsByPostId = async (postId) => {
         'username', u.username,
         'account', u.account,
         'avatar', u.avatar
-      ) as sender
+      ) as sender,
+      CASE WHEN ru.id IS NULL THEN NULL ELSE json_build_object(
+        'id', ru.id,
+        'username', ru.username,
+        'account', ru.account,
+        'avatar', ru.avatar
+      ) END as receiver
     FROM comments c
     JOIN users u ON c.sender_id = u.id
+    LEFT JOIN users ru ON c.receiver_id = ru.id
     WHERE c.post_id = $1
     ORDER BY c.created_at ASC
   `, [postId]);
@@ -185,12 +193,12 @@ const findRandomRecentPosts = async (limit = 10) => {
   return attachCommentsToPosts(result.rows);
 };
 
-const createComment = async ({ postId, content, senderId, parentId = null }) => {
+const createComment = async ({ postId, content, senderId, parentId = null, receiverId = null }) => {
   const result = await pool.query(
-    `INSERT INTO comments (post_id, content, sender_id, parent_id)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO comments (post_id, content, sender_id, parent_id, receiver_id)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
-    [postId, content, senderId, parentId]
+    [postId, content, senderId, parentId, receiverId]
   );
   return result.rows[0];
 };
@@ -208,9 +216,16 @@ const findFullCommentById = async (id) => {
         'username', u.username,
         'account', u.account,
         'avatar', u.avatar
-      ) as sender
+      ) as sender,
+      CASE WHEN ru.id IS NULL THEN NULL ELSE json_build_object(
+        'id', ru.id,
+        'username', ru.username,
+        'account', ru.account,
+        'avatar', ru.avatar
+      ) END as receiver
     FROM comments c
     JOIN users u ON c.sender_id = u.id
+    LEFT JOIN users ru ON c.receiver_id = ru.id
     WHERE c.id = $1
   `, [id]);
 
@@ -223,6 +238,7 @@ const findFullCommentById = async (id) => {
     time: formatTime(row.created_at),
     type: row.parent_id ? 'REPLYCOMMENT' : 'POSTCOMMENT',
     sender: row.sender,
+    receiver: row.receiver || null,
     likes: row.likes,
     comments: []
   };

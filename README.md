@@ -409,6 +409,7 @@ GET /api/posts
             "account": "user456",
             "avatar": null
           },
+          "receiver": null,
           "likes": 3,
           "comments": [
             {
@@ -421,6 +422,12 @@ GET /api/posts
                 "username": "张三",
                 "account": "user123",
                 "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+              },
+              "receiver": {
+                "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                "username": "李四",
+                "account": "user456",
+                "avatar": null
               },
               "likes": 1,
               "comments": []
@@ -484,6 +491,7 @@ GET /api/posts/:id
           "account": "user456",
           "avatar": null
         },
+        "receiver": null,
         "likes": 3,
         "comments": [
           {
@@ -496,6 +504,12 @@ GET /api/posts/:id
               "username": "张三",
               "account": "user123",
               "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+            },
+            "receiver": {
+              "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+              "username": "李四",
+              "account": "user456",
+              "avatar": null
             },
             "likes": 1,
             "comments": []
@@ -519,6 +533,7 @@ GET /api/posts/:id
 | `time` | string | 评论时间 |
 | `type` | string | 评论类型：`POSTCOMMENT`（评论帖子）/ `REPLYCOMMENT`（回复评论） |
 | `sender` | object | 评论者信息（`id` / `username` / `account` / `avatar`） |
+| `receiver` | object | 被回复者信息（`id` / `username` / `account` / `avatar`）；`REPLYCOMMENT` 时返回，根评论为 `null` |
 | `likes` | int | 点赞数 |
 | `comments` | array | 该评论下的回复（嵌套评论树，可能为空数组） |
 
@@ -582,6 +597,7 @@ GET /api/posts/random
             "account": "user456",
             "avatar": null
           },
+          "receiver": null,
           "likes": 3,
           "comments": []
         }
@@ -722,19 +738,22 @@ Content-Type: application/json
 }
 ```
 
-**Response `200`：** `data` 为更新后的用户信息。
+**Response `200`：** `data.user` 为更新后的用户信息；`data.token` 为新生成的 Token（有效期重置为 7 天），客户端应使用它替换本地保存的旧 Token。
 
 ```json
 {
   "code": 200,
   "message": "更新成功",
   "data": {
-    "id": "uuid",
-    "account": "user123",
-    "username": "张三",
-    "avatar": "https://i.ibb.co/xxx/avatar.jpg",
-    "bio": "热爱生活，热爱记录",
-    "join_time": "2024-01-01 00:00:00"
+    "user": {
+      "id": "uuid",
+      "account": "user123",
+      "username": "张三",
+      "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+      "bio": "热爱生活，热爱记录",
+      "join_time": "2024-01-01 00:00:00"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIs..."
   }
 }
 ```
@@ -761,7 +780,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
-需要登录。为指定帖子添加一条评论；`commentType` 为 `REPLYCOMMENT` 时则为对某条评论的**回复（嵌套评论）**。评论结构对应客户端 `data class Comment(id, content, time, type, sender, likes, comments)`。
+需要登录。为指定帖子添加一条评论；`commentType` 为 `REPLYCOMMENT` 时则为对某条评论的**回复（嵌套评论）**，需同时携带 `commentId`（被回复的评论 ID）与 `receiverId`（被回复者用户 ID）。评论结构对应客户端 `data class Comment(id, content, time, type, sender, receiver, likes, comments)`。
 
 **Request Body（JSON）：**
 
@@ -769,7 +788,8 @@ Content-Type: application/json
 |------|------|------|------|
 | `senderId` | string | 是 | 评论者用户 ID（服务端以登录 token 中的用户为准） |
 | `commentType` | string | 是 | 评论类型：`POSTCOMMENT`（评论帖子）/ `REPLYCOMMENT`（回复评论） |
-| `receiverId` | string | 否 | 被回复的评论 ID（`commentType` 为 `REPLYCOMMENT` 时必填），必须属于同一帖子 |
+| `receiverId` | string | 否 | 被回复者（用户）ID（`commentType` 为 `REPLYCOMMENT` 时必填） |
+| `commentId` | string | 否 | 被回复的评论 ID（`commentType` 为 `REPLYCOMMENT` 时必填），必须属于同一帖子 |
 | `postId` | string | 是 | 被评论的帖子 ID |
 | `content` | string | 是 | 评论内容，不能为空 |
 
@@ -790,7 +810,8 @@ Content-Type: application/json
 {
   "senderId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
   "commentType": "REPLYCOMMENT",
-  "receiverId": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+  "receiverId": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+  "commentId": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
   "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
   "content": "谢谢～"
 }
@@ -813,6 +834,7 @@ Content-Type: application/json
       "account": "user456",
       "avatar": null
     },
+    "receiver": null,
     "likes": 0,
     "comments": []
   }
@@ -826,12 +848,14 @@ Content-Type: application/json
 | 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
 | 400 | 400 | 评论内容不能为空 |
 | 400 | 400 | 帖子ID不能为空 |
-| 400 | 400 | 回复的评论不能为空 |
+| 400 | 400 | 回复的评论ID(commentId)不能为空 |
+| 400 | 400 | 被回复者ID(receiverId)不能为空 |
 | 400 | 400 | 回复的评论不存在 |
+| 400 | 400 | 被回复的用户不存在 |
 | 404 | 404 | 帖子不存在 |
 | 500 | 500 | 评论失败，请稍后重试 |
 
-**说明：** 评论成功后可调用 `GET /api/posts/:id` 重新拉取帖子详情，其中 `comments` 为按时间正序的**嵌套评论树**——每条评论的 `comments` 字段存放其下所有回复，根评论（`POSTCOMMENT`）无 `parentId`。客户端 `Comment` 模型中的 `type` 对应服务端返回的 `type` 字段：根评论为 `POSTCOMMENT`，回复为 `REPLYCOMMENT`；`comments` 缺省为空列表。`senderId` 仅作请求参数，实际评论归属以登录 token 认证的用户为准。
+**说明：** 评论成功后可调用 `GET /api/posts/:id` 重新拉取帖子详情，其中 `comments` 为按时间正序的**嵌套评论树**——每条评论的 `comments` 字段存放其下所有回复，根评论（`POSTCOMMENT`）无 `parentId`。客户端 `Comment` 模型中的 `type` 对应服务端返回的 `type` 字段：根评论为 `POSTCOMMENT`，回复为 `REPLYCOMMENT`；`receiver` 为被回复者信息（`REPLYCOMMENT` 时返回，根评论为 `null`）；`comments` 缺省为空列表。`senderId` 仅作请求参数，实际评论归属以登录 token 认证的用户为准。
 
 ## 图片存储说明
 
@@ -887,12 +911,13 @@ CREATE TABLE post_medias (
 );
 
 CREATE TABLE comments (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-  parent_id  UUID REFERENCES comments(id) ON DELETE CASCADE,
-  content    TEXT NOT NULL,
-  sender_id  UUID NOT NULL REFERENCES users(id),
-  likes      INT DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  post_id     UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  parent_id   UUID REFERENCES comments(id) ON DELETE CASCADE,
+  receiver_id UUID REFERENCES users(id),
+  content     TEXT NOT NULL,
+  sender_id   UUID NOT NULL REFERENCES users(id),
+  likes       INT DEFAULT 0,
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```

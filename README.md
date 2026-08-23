@@ -696,7 +696,64 @@ GET /api/users/:id
 
 ---
 
-### 12. 发表评论 / 回复
+### 12. 更新个人资料
+
+```
+PUT /api/users/profile
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+需要登录。更新**当前登录用户**的用户名、头像和/或签名，用户身份以 token 为准（无法修改他人资料）。各字段均可省略，省略的字段保持原值，但至少需要提供一个。
+
+**Request Body（JSON）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `username` | string | 否 | 新用户名，不能为空串，最长 100 个字符，首尾空格会被去除 |
+| `avatar` | string | 否 | 头像图片 URL（客户端先上传图床获取 URL 后传入） |
+| `bio` | string | 否 | 个性签名，最长 200 个字符，传空串 `""` 可清空签名 |
+
+```json
+{
+  "username": "张三",
+  "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+  "bio": "热爱生活，热爱记录"
+}
+```
+
+**Response `200`：** `data` 为更新后的用户信息。
+
+```json
+{
+  "code": 200,
+  "message": "更新成功",
+  "data": {
+    "id": "uuid",
+    "account": "user123",
+    "username": "张三",
+    "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+    "bio": "热爱生活，热爱记录",
+    "join_time": "2024-01-01 00:00:00"
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | 没有需要更新的内容 |
+| 400 | 400 | 用户名不能为空 |
+| 400 | 400 | 用户名长度不能超过100个字符 |
+| 400 | 400 | 签名长度不能超过200个字符 |
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 404 | 404 | 用户不存在 |
+| 500 | 500 | 更新个人资料失败 |
+
+---
+
+### 13. 发表评论 / 回复
 
 ```
 POST /api/comments

@@ -37,4 +37,19 @@ const createUser = async (account, password, username) => {
   return formatUser(result.rows[0]);
 };
 
-module.exports = { findByAccount, findById, createUser };
+// 更新用户资料（用户名、头像、签名），未提供的字段保持原值
+const updateProfile = async (id, { username, avatar, bio }) => {
+  const result = await pool.query(
+    `UPDATE users
+     SET username = COALESCE($1, username),
+         avatar = COALESCE($2, avatar),
+         bio = COALESCE($3, bio),
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $4
+     RETURNING id, account, username, avatar, bio, join_time`,
+    [username ?? null, avatar ?? null, bio ?? null, id]
+  );
+  return formatUser(result.rows[0] || null);
+};
+
+module.exports = { findByAccount, findById, createUser, updateProfile };

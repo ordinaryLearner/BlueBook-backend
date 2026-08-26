@@ -69,7 +69,7 @@ const initDatabase = async () => {
         receiver_id UUID REFERENCES users(id),
         content     TEXT NOT NULL,
         sender_id   UUID NOT NULL REFERENCES users(id),
-        likes       INT DEFAULT 0,
+        likes       JSONB DEFAULT '[]'::jsonb,
         created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -85,6 +85,21 @@ const initDatabase = async () => {
       ALTER TABLE comments
       ADD COLUMN IF NOT EXISTS receiver_id UUID REFERENCES users(id)
     `);
+
+    // 兼容已存在的表：likes 由 INT(点赞数)迁移为 JSONB(点赞用户 ID 列表)
+    // 旧计数无法还原具体点赞用户，故统一置为空数组
+    const likesType = await pool.query(`
+      SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'comments' AND column_name = 'likes' LIMIT 1
+    `);
+    if (likesType.rows.length > 0 && likesType.rows[0].data_type !== 'jsonb') {
+      await pool.query(`
+        ALTER TABLE comments
+        ALTER COLUMN likes TYPE JSONB USING '[]'::jsonb,
+        ALTER COLUMN likes SET DEFAULT '[]'::jsonb,
+        ALTER COLUMN likes SET NOT NULL
+      `);
+    }
 
     console.log('Database tables initialized successfully');
   } catch (error) {

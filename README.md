@@ -396,7 +396,14 @@ GET /api/posts
           "url": "https://i.ibb.co/w04Prt6/c1f64245afb2.jpg"
         }
       ],
-      "likes": ["a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"],
+      "likes": [
+        {
+          "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          "username": "张三",
+          "account": "user123",
+          "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+        }
+      ],
       "comments": [
         {
           "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
@@ -410,7 +417,20 @@ GET /api/posts
             "avatar": null
           },
           "receiver": null,
-          "likes": 3,
+        "likes": [
+          {
+            "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+            "username": "李四",
+            "account": "user456",
+            "avatar": null
+          },
+          {
+            "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+            "username": "张三",
+            "account": "user123",
+            "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+          }
+        ],
           "comments": [
             {
               "id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f7a",
@@ -429,7 +449,14 @@ GET /api/posts
                 "account": "user456",
                 "avatar": null
               },
-              "likes": 1,
+              "likes": [
+              {
+                "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                "username": "李四",
+                "account": "user456",
+                "avatar": null
+              }
+            ],
               "comments": []
             }
           ]
@@ -478,7 +505,14 @@ GET /api/posts/:id
         "url": "https://i.ibb.co/w04Prt6/c1f64245afb2.jpg"
       }
     ],
-    "likes": ["a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"],
+    "likes": [
+      {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123",
+        "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+      }
+    ],
     "comments": [
       {
         "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
@@ -492,7 +526,20 @@ GET /api/posts/:id
           "avatar": null
         },
         "receiver": null,
-        "likes": 3,
+        "likes": [
+          {
+            "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+            "username": "李四",
+            "account": "user456",
+            "avatar": null
+          },
+          {
+            "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+            "username": "张三",
+            "account": "user123",
+            "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+          }
+        ],
         "comments": [
           {
             "id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f7a",
@@ -511,7 +558,14 @@ GET /api/posts/:id
               "account": "user456",
               "avatar": null
             },
-            "likes": 1,
+            "likes": [
+              {
+                "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                "username": "李四",
+                "account": "user456",
+                "avatar": null
+              }
+            ],
             "comments": []
           }
         ]
@@ -534,7 +588,7 @@ GET /api/posts/:id
 | `type` | string | 评论类型：`POSTCOMMENT`（评论帖子）/ `REPLYCOMMENT`（回复评论） |
 | `sender` | object | 评论者信息（`id` / `username` / `account` / `avatar`） |
 | `receiver` | object | 被回复者信息（`id` / `username` / `account` / `avatar`）；`REPLYCOMMENT` 时返回，根评论为 `null` |
-| `likes` | int | 点赞数 |
+| `likes` | array | 点赞用户列表（User 对象数组，元素含 `id` / `username` / `account` / `avatar`） |
 | `comments` | array | 该评论下的回复（嵌套评论树，可能为空数组） |
 
 **错误码：**
@@ -584,7 +638,14 @@ GET /api/posts/random
           "url": "https://i.ibb.co/98W13PY/c1f64245afb2.jpg"
         }
       ],
-      "likes": ["a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"],
+      "likes": [
+        {
+          "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          "username": "张三",
+          "account": "user123",
+          "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+        }
+      ],
       "comments": [
         {
           "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
@@ -598,7 +659,20 @@ GET /api/posts/random
             "avatar": null
           },
           "receiver": null,
-          "likes": 3,
+        "likes": [
+          {
+            "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+            "username": "李四",
+            "account": "user456",
+            "avatar": null
+          },
+          {
+            "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+            "username": "张三",
+            "account": "user123",
+            "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+          }
+        ],
           "comments": []
         }
       ],
@@ -633,7 +707,7 @@ GET /api/posts/random
 
 - `data` 是 **JSON 数组**，长度 ≤ 10（数据库中较新帖子不足 10 条时按实际数量返回）
 - 每条帖子的结构完全相同，Android 端可解析为 `List<Post>`
-- `sender` 为完整的用户信息对象；`medias` 为图片列表（可为空数组）；`likes` 为用户 ID 数组；`comments` 为评论列表（可为空数组）
+- `sender` 为完整的用户信息对象；`medias` 为图片列表（可为空数组）；`likes` 为点赞用户列表（User 对象数组，可为空）；`comments` 为评论列表（可为空数组）
 
 ---
 
@@ -835,7 +909,7 @@ Content-Type: application/json
       "avatar": null
     },
     "receiver": null,
-    "likes": 0,
+    "likes": [],
     "comments": []
   }
 }

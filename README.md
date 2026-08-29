@@ -931,6 +931,198 @@ Content-Type: application/json
 
 **说明：** 评论成功后可调用 `GET /api/posts/:id` 重新拉取帖子详情，其中 `comments` 为按时间正序的**嵌套评论树**——每条评论的 `comments` 字段存放其下所有回复，根评论（`POSTCOMMENT`）无 `parentId`。客户端 `Comment` 模型中的 `type` 对应服务端返回的 `type` 字段：根评论为 `POSTCOMMENT`，回复为 `REPLYCOMMENT`；`receiver` 为被回复者信息（`REPLYCOMMENT` 时返回，根评论为 `null`）；`comments` 缺省为空列表。`senderId` 仅作请求参数，实际评论归属以登录 token 认证的用户为准。
 
+---
+
+### 15. 点赞
+
+```
+POST /api/likes
+Content-Type: application/json
+```
+
+为指定帖子或评论点赞：将请求中的 `userid` 加入目标对象（帖子或评论）的 `likes` 列表（若已存在则保持不变，不会重复点赞），成功后在 `data` 中返回该帖子或评论的**最新数据**（`likes` 为点赞用户对象数组，可为空）。
+
+**Request Body（JSON）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userid` | string | 是 | 点赞者用户 ID |
+| `type` | string | 是 | 点赞对象类型：`post`（帖子）/ `comment`（评论） |
+| `postId` | string | 否 | 点赞对象为帖子时必填，帖子 ID |
+| `commentId` | string | 否 | 点赞对象为评论时必填，评论 ID |
+
+点赞帖子示例：
+
+```json
+{
+  "userid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "type": "post",
+  "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"
+}
+```
+
+点赞评论示例：
+
+```json
+{
+  "userid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "type": "comment",
+  "commentId": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f"
+}
+```
+
+**Response `201`（点赞帖子）：** 返回该帖子的最新完整数据，`likes` 已更新为点赞用户对象列表。
+
+```json
+{
+  "code": 200,
+  "message": "点赞成功",
+  "data": {
+    "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+    "title": "标题",
+    "content": "正文",
+    "sender": {
+      "id": "uuid",
+      "username": "用户名",
+      "account": "账号",
+      "avatar": null,
+      "bio": null,
+      "join_time": "2024-01-01 00:00:00"
+    },
+    "medias": [],
+    "likes": [
+      {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "account": "user456",
+        "username": "李四",
+        "avatar": null,
+        "bio": null,
+        "join_time": "2024-01-01 00:00:00"
+      }
+    ],
+    "comments": [],
+    "time": "2024-01-01 00:00:00",
+    "created_at": "2024-01-01 00:00:00",
+    "updated_at": "2024-01-01 00:00:00"
+  }
+}
+```
+
+**Response `201`（点赞评论）：** 返回该评论的最新数据，结构同 `POST /api/comments` 返回的单条评论。
+
+```json
+{
+  "code": 200,
+  "message": "点赞成功",
+  "data": {
+    "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+    "content": "拍得真好看！",
+    "time": "2024-01-01 00:00:00",
+    "type": "POSTCOMMENT",
+    "sender": {
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "username": "李四",
+      "account": "user456",
+      "avatar": null
+    },
+    "receiver": null,
+    "likes": [
+      {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "account": "user456",
+        "username": "李四",
+        "avatar": null,
+        "bio": null,
+        "join_time": "2024-01-01 00:00:00"
+      }
+    ],
+    "comments": []
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | 点赞对象类型 type 必须为 post 或 comment |
+| 400 | 400 | 帖子ID(postId)不能为空 |
+| 400 | 400 | 评论ID(commentId)不能为空 |
+| 400 | 400 | 用户ID(userid)不能为空 |
+| 404 | 404 | 帖子不存在 |
+| 404 | 404 | 评论不存在 |
+| 500 | 500 | 点赞失败，请稍后重试 |
+
+---
+
+### 16. 取消点赞
+
+```
+DELETE /api/likes
+Content-Type: application/json
+```
+
+取消对指定帖子或评论的点赞：将请求中的 `userid` 从目标对象（帖子或评论）的 `likes` 列表中移除（若用户本就未点赞，则结果不变，不影响其他点赞），成功后在 `data` 中返回该帖子或评论的**最新数据**。
+
+**Request Body（JSON）：** 与点赞接口相同。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userid` | string | 是 | 取消点赞者用户 ID |
+| `type` | string | 是 | 点赞对象类型：`post`（帖子）/ `comment`（评论） |
+| `postId` | string | 否 | 点赞对象为帖子时必填，帖子 ID |
+| `commentId` | string | 否 | 点赞对象为评论时必填，评论 ID |
+
+取消点赞帖子示例：
+
+```json
+{
+  "userid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "type": "post",
+  "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"
+}
+```
+
+**Response `200`：** 返回该帖子或评论的最新数据（`likes` 已移除该用户），结构与点赞接口 `data` 一致。
+
+```json
+{
+  "code": 200,
+  "message": "取消点赞成功",
+  "data": {
+    "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+    "title": "标题",
+    "content": "正文",
+    "sender": {
+      "id": "uuid",
+      "username": "用户名",
+      "account": "账号",
+      "avatar": null,
+      "bio": null,
+      "join_time": "2024-01-01 00:00:00"
+    },
+    "medias": [],
+    "likes": [],
+    "comments": [],
+    "time": "2024-01-01 00:00:00",
+    "created_at": "2024-01-01 00:00:00",
+    "updated_at": "2024-01-01 00:00:00"
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | 点赞对象类型 type 必须为 post 或 comment |
+| 400 | 400 | 帖子ID(postId)不能为空 |
+| 400 | 400 | 评论ID(commentId)不能为空 |
+| 400 | 400 | 用户ID(userid)不能为空 |
+| 404 | 404 | 帖子不存在 |
+| 404 | 404 | 评论不存在 |
+| 500 | 500 | 取消点赞失败，请稍后重试 |
+
 ## 图片存储说明
 
 当前版本**不存储图片文件**，也不经过任何图床服务。客户端直接将图片的 URL（URI）数组随发布请求一起提交，后端只把这些 URL 原样存入 `post_medias` 表的 `url` 字段。

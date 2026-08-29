@@ -260,6 +260,32 @@ const findCommentById = async (id) => {
   return result.rows[0] || null;
 };
 
+// 点赞：将用户 ID 加入 posts 或 comments 的 likes(JSONB 用户 ID 列表)，已存在则保持不变，返回更新后的目标行
+const addLike = async (targetType, targetId, userId) => {
+  const table = targetType === 'post' ? 'posts' : 'comments';
+  const setExpr = targetType === 'post'
+    ? 'SET likes = CASE WHEN likes @> $2::jsonb THEN likes ELSE likes || $2::jsonb END, updated_at = CURRENT_TIMESTAMP'
+    : 'SET likes = CASE WHEN likes @> $2::jsonb THEN likes ELSE likes || $2::jsonb END';
+  const result = await pool.query(
+    `UPDATE ${table} ${setExpr} WHERE id = $1 RETURNING *`,
+    [targetId, JSON.stringify([userId])]
+  );
+  return result.rows[0] || null;
+};
+
+// 取消点赞：将用户 ID 从 posts 或 comments 的 likes(JSONB 用户 ID 列表)中移除，返回更新后的目标行
+const removeLike = async (targetType, targetId, userId) => {
+  const table = targetType === 'post' ? 'posts' : 'comments';
+  const setExpr = targetType === 'post'
+    ? "SET likes = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb) FROM jsonb_array_elements(likes) elem WHERE elem::text <> $2), updated_at = CURRENT_TIMESTAMP"
+    : "SET likes = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb) FROM jsonb_array_elements(likes) elem WHERE elem::text <> $2)";
+  const result = await pool.query(
+    `UPDATE ${table} ${setExpr} WHERE id = $1 RETURNING *`,
+    [targetId, JSON.stringify(userId)]
+  );
+  return result.rows[0] || null;
+};
+
 const findFullCommentById = async (id) => {
   const result = await pool.query(`
     SELECT c.*,
@@ -304,5 +330,7 @@ module.exports = {
   findRandomRecentPosts,
   createComment,
   findCommentById,
-  findFullCommentById
+  findFullCommentById,
+  addLike,
+  removeLike
 };

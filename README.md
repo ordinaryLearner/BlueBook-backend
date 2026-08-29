@@ -417,20 +417,20 @@ GET /api/posts
             "avatar": null
           },
           "receiver": null,
-        "likes": [
-          {
-            "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-            "username": "李四",
-            "account": "user456",
-            "avatar": null
-          },
-          {
-            "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-            "username": "张三",
-            "account": "user123",
-            "avatar": "https://i.ibb.co/xxx/avatar.jpg"
-          }
-        ],
+          "likes": [
+            {
+              "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+              "username": "李四",
+              "account": "user456",
+              "avatar": null
+            },
+            {
+              "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+              "username": "张三",
+              "account": "user123",
+              "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+            }
+          ],
           "comments": [
             {
               "id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f7a",
@@ -450,13 +450,13 @@ GET /api/posts
                 "avatar": null
               },
               "likes": [
-              {
-                "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-                "username": "李四",
-                "account": "user456",
-                "avatar": null
-              }
-            ],
+                {
+                  "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                  "username": "李四",
+                  "account": "user456",
+                  "avatar": null
+                }
+              ],
               "comments": []
             }
           ]
@@ -947,7 +947,7 @@ Content-Type: application/json
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `userid` | string | 是 | 点赞者用户 ID |
-| `type` | string | 是 | 点赞对象类型：`post`（帖子）/ `comment`（评论） |
+| `type` | string | 是 | 点赞对象类型：`POSTLIKE`（帖子）/ `COMMENTLIKE`（评论），对应客户端 `LikeType` 枚举 |
 | `postId` | string | 否 | 点赞对象为帖子时必填，帖子 ID |
 | `commentId` | string | 否 | 点赞对象为评论时必填，评论 ID |
 
@@ -956,7 +956,7 @@ Content-Type: application/json
 ```json
 {
   "userid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-  "type": "post",
+  "type": "POSTLIKE",
   "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"
 }
 ```
@@ -966,7 +966,7 @@ Content-Type: application/json
 ```json
 {
   "userid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-  "type": "comment",
+  "type": "COMMENTLIKE",
   "commentId": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f"
 }
 ```
@@ -1045,7 +1045,7 @@ Content-Type: application/json
 
 | 状态码 | code | message |
 |--------|------|---------|
-| 400 | 400 | 点赞对象类型 type 必须为 post 或 comment |
+| 400 | 400 | 点赞对象类型 type 必须为 POSTLIKE 或 COMMENTLIKE |
 | 400 | 400 | 帖子ID(postId)不能为空 |
 | 400 | 400 | 评论ID(commentId)不能为空 |
 | 400 | 400 | 用户ID(userid)不能为空 |
@@ -1069,7 +1069,7 @@ Content-Type: application/json
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `userid` | string | 是 | 取消点赞者用户 ID |
-| `type` | string | 是 | 点赞对象类型：`post`（帖子）/ `comment`（评论） |
+| `type` | string | 是 | 点赞对象类型：`POSTLIKE`（帖子）/ `COMMENTLIKE`（评论），对应客户端 `LikeType` 枚举 |
 | `postId` | string | 否 | 点赞对象为帖子时必填，帖子 ID |
 | `commentId` | string | 否 | 点赞对象为评论时必填，评论 ID |
 
@@ -1078,7 +1078,7 @@ Content-Type: application/json
 ```json
 {
   "userid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-  "type": "post",
+  "type": "POSTLIKE",
   "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"
 }
 ```
@@ -1115,7 +1115,7 @@ Content-Type: application/json
 
 | 状态码 | code | message |
 |--------|------|---------|
-| 400 | 400 | 点赞对象类型 type 必须为 post 或 comment |
+| 400 | 400 | 点赞对象类型 type 必须为 POSTLIKE 或 COMMENTLIKE |
 | 400 | 400 | 帖子ID(postId)不能为空 |
 | 400 | 400 | 评论ID(commentId)不能为空 |
 | 400 | 400 | 用户ID(userid)不能为空 |

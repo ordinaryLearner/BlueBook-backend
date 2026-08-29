@@ -1058,11 +1058,13 @@ Content-Type: application/json
 ### 16. 取消点赞
 
 ```
-DELETE /api/likes
+POST /api/likes/unlike
 Content-Type: application/json
 ```
 
 取消对指定帖子或评论的点赞：将请求中的 `userId` 从目标对象（帖子或评论）的 `likes` 列表中移除（若用户本就未点赞，则结果不变，不影响其他点赞），成功后在 `data` 中返回该帖子或评论的**最新数据**。
+
+> **说明：** 接口使用 `POST` 携带 JSON 请求体。若客户端使用 Retrofit，需声明为 `@POST("api/likes/unlike")` 并保留 `@Body`——不要用 `@DELETE`（Retrofit 的 `@DELETE` 不支持 `@Body`）。
 
 **Request Body（JSON）：** 与点赞接口相同。
 

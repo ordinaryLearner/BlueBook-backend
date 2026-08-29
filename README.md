@@ -940,13 +940,13 @@ POST /api/likes
 Content-Type: application/json
 ```
 
-为指定帖子或评论点赞：将请求中的 `userid` 加入目标对象（帖子或评论）的 `likes` 列表（若已存在则保持不变，不会重复点赞），成功后在 `data` 中返回该帖子或评论的**最新数据**（`likes` 为点赞用户对象数组，可为空）。
+为指定帖子或评论点赞：将请求中的 `userId` 加入目标对象（帖子或评论）的 `likes` 列表（若已存在则保持不变，不会重复点赞），成功后在 `data` 中返回该帖子或评论的**最新数据**（`likes` 为点赞用户对象数组，可为空）。
 
 **Request Body（JSON）：**
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `userid` | string | 是 | 点赞者用户 ID |
+| `userId` | string | 是 | 点赞者用户 ID |
 | `type` | string | 是 | 点赞对象类型：`POSTLIKE`（帖子）/ `COMMENTLIKE`（评论），对应客户端 `LikeType` 枚举 |
 | `postId` | string | 否 | 点赞对象为帖子时必填，帖子 ID |
 | `commentId` | string | 否 | 点赞对象为评论时必填，评论 ID |
@@ -955,7 +955,7 @@ Content-Type: application/json
 
 ```json
 {
-  "userid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "userId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
   "type": "POSTLIKE",
   "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"
 }
@@ -965,7 +965,7 @@ Content-Type: application/json
 
 ```json
 {
-  "userid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "userId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
   "type": "COMMENTLIKE",
   "commentId": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f"
 }
@@ -1048,7 +1048,7 @@ Content-Type: application/json
 | 400 | 400 | 点赞对象类型 type 必须为 POSTLIKE 或 COMMENTLIKE |
 | 400 | 400 | 帖子ID(postId)不能为空 |
 | 400 | 400 | 评论ID(commentId)不能为空 |
-| 400 | 400 | 用户ID(userid)不能为空 |
+| 400 | 400 | 用户ID(userId)不能为空 |
 | 404 | 404 | 帖子不存在 |
 | 404 | 404 | 评论不存在 |
 | 500 | 500 | 点赞失败，请稍后重试 |
@@ -1062,13 +1062,13 @@ DELETE /api/likes
 Content-Type: application/json
 ```
 
-取消对指定帖子或评论的点赞：将请求中的 `userid` 从目标对象（帖子或评论）的 `likes` 列表中移除（若用户本就未点赞，则结果不变，不影响其他点赞），成功后在 `data` 中返回该帖子或评论的**最新数据**。
+取消对指定帖子或评论的点赞：将请求中的 `userId` 从目标对象（帖子或评论）的 `likes` 列表中移除（若用户本就未点赞，则结果不变，不影响其他点赞），成功后在 `data` 中返回该帖子或评论的**最新数据**。
 
 **Request Body（JSON）：** 与点赞接口相同。
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `userid` | string | 是 | 取消点赞者用户 ID |
+| `userId` | string | 是 | 取消点赞者用户 ID |
 | `type` | string | 是 | 点赞对象类型：`POSTLIKE`（帖子）/ `COMMENTLIKE`（评论），对应客户端 `LikeType` 枚举 |
 | `postId` | string | 否 | 点赞对象为帖子时必填，帖子 ID |
 | `commentId` | string | 否 | 点赞对象为评论时必填，评论 ID |
@@ -1077,7 +1077,7 @@ Content-Type: application/json
 
 ```json
 {
-  "userid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "userId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
   "type": "POSTLIKE",
   "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"
 }
@@ -1118,7 +1118,7 @@ Content-Type: application/json
 | 400 | 400 | 点赞对象类型 type 必须为 POSTLIKE 或 COMMENTLIKE |
 | 400 | 400 | 帖子ID(postId)不能为空 |
 | 400 | 400 | 评论ID(commentId)不能为空 |
-| 400 | 400 | 用户ID(userid)不能为空 |
+| 400 | 400 | 用户ID(userId)不能为空 |
 | 404 | 404 | 帖子不存在 |
 | 404 | 404 | 评论不存在 |
 | 500 | 500 | 取消点赞失败，请稍后重试 |

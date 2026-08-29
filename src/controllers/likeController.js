@@ -3,20 +3,20 @@ const { addLike, removeLike, findPostById, findFullCommentById } = require('../m
 // 客户端枚举 LikeType 传到请求体的字符串：POSTLIKE / COMMENTLIKE，内部归一化为 post / comment
 const TYPE_MAP = { POSTLIKE: 'post', COMMENTLIKE: 'comment' };
 
-// 校验 type/目标ID/userid，返回 { error } 或 { type, targetId, userId }
+// 校验 type/目标ID/userId，返回 { error } 或 { type, targetId, userId }
 const parseLikeParams = (body) => {
-  const { userid, type, postId, commentId } = body;
+  const { userId, type, postId, commentId } = body;
 
   const targetType = TYPE_MAP[type] || null;
   if (!targetType) return { error: '点赞对象类型 type 必须为 POSTLIKE 或 COMMENTLIKE' };
-  if (!userid) return { error: '用户ID(userid)不能为空' };
+  if (!userId) return { error: '用户ID(userId)不能为空' };
 
   const targetId = targetType === 'post' ? postId : commentId;
   if (!targetId) {
     return { error: targetType === 'post' ? '帖子ID(postId)不能为空' : '评论ID(commentId)不能为空' };
   }
 
-  return { type: targetType, targetId, userId: userid };
+  return { type: targetType, targetId, userId };
 };
 
 const resolveLatest = (type, targetId) =>

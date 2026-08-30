@@ -75,25 +75,44 @@ exports.getMyPosts = async (req, res) => {
   }
 };
 
+const UUID_RE = /^[0-9a-fA-F-]{36}$/;
+
+// 将各种来源的 excludeIds（JSON 数组 / 逗号分隔字符串 / 单个字符串 / JSON 字符串）归一化为合法的 UUID 数组
+const parseExcludeIds = (value) => {
+  if (value == null) return [];
+
+  let list = value;
+  if (!Array.isArray(list)) {
+    // 尝试解析 JSON 字符串（如客户端把整个数组序列化成了一个字符串）
+    if (typeof list === 'string') {
+      const trimmed = list.trim();
+      if (trimmed.startsWith('[')) {
+        try { list = JSON.parse(trimmed); } catch (e) { list = trimmed; }
+      }
+    }
+    if (!Array.isArray(list)) {
+      list = String(list).split(',').map((s) => s.trim()).filter(Boolean);
+    }
+  }
+
+  return (Array.isArray(list) ? list : [])
+    .filter((id) => typeof id === 'string' && UUID_RE.test(id.trim()))
+    .map((id) => id.trim());
+};
+
 exports.getRandomPosts = async (req, res) => {
   try {
     // 客户端上传已获取的帖子 ID（数组），服务端将其从随机池中排除
-    let excludeIds = req.body && req.body.excludeIds;
-    if (!Array.isArray(excludeIds)) {
-      const raw = req.query && req.query.excludeIds;
-      if (raw) {
-        excludeIds = Array.isArray(raw) ? raw : String(raw).split(',').map((s) => s.trim());
-      }
+    let excludeIds = parseExcludeIds(req.body && req.body.excludeIds);
+    if (excludeIds.length === 0) {
+      excludeIds = parseExcludeIds(req.query && req.query.excludeIds);
     }
-    excludeIds = (Array.isArray(excludeIds) ? excludeIds : [])
-      .filter((id) => typeof id === 'string' && id.trim() && /^[0-9a-fA-F-]{36}$/.test(id.trim()))
-      .map((id) => id.trim());
 
     const LIMIT = 10;
     const posts = await findRandomRecentPosts(LIMIT, excludeIds);
 
     // 剩余帖子不足一条时，说明已无更多可获取的数据，message 提示客户端停止刷新/加载
-    const message = posts.length < LIMIT ? '已无相关数据' : 'success';
+    const message = posts.length < LIMIT ? 'NoMore' : 'success';
 
     res.json({
       code: 200,

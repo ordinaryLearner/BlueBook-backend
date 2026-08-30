@@ -223,7 +223,8 @@ const findPostsByUserId = async (userId) => {
   return attachCommentsToPosts(result.rows);
 };
 
-const findRandomRecentPosts = async (limit = 10) => {
+const findRandomRecentPosts = async (limit = 10, excludeIds = []) => {
+  const ids = Array.isArray(excludeIds) ? excludeIds.filter(Boolean) : [];
   const result = await pool.query(`
     SELECT p.*,
       json_build_object(
@@ -238,9 +239,10 @@ const findRandomRecentPosts = async (limit = 10) => {
       SELECT * FROM posts ORDER BY created_at DESC LIMIT 100
     ) p
     JOIN users u ON p.sender_id = u.id
+    WHERE ($1::uuid[] IS NULL) OR NOT (p.id = ANY($1::uuid[]))
     ORDER BY RANDOM()
-    LIMIT $1
-  `, [limit]);
+    LIMIT $2
+  `, [ids.length > 0 ? ids : null, limit]);
 
   return attachCommentsToPosts(result.rows);
 };

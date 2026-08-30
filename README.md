@@ -603,11 +603,29 @@ GET /api/posts/:id
 
 ```
 GET /api/posts/random
+POST /api/posts/random
 ```
 
 无需登录。从数据库中**较新的 100 条帖子**中随机返回 10 条，适用于首页推荐等场景。
 
-**Response `200`：** `data` 为一个**数组（列表）**，最多包含 10 条完整帖子对象，例如：
+客户端可**上传已获取的帖子 ID**（`excludeIds` 数组，JSON 请求体），服务端会**排除这些帖子**后从剩余帖子中随机返回 10 条，用于分页下拉刷新/加载更多时避免重复推荐。不带 `excludeIds` 时行为不变。
+
+使用建议：Android 端 Retrofit 的 **GET 请求无法携带请求体**，因此请使用 `POST /api/posts/random` 并携带 `excludeIds` 请求体；`GET /api/posts/random` 保留用于无需排除（或通过 `?excludeIds=id1,id2` 查询参数排除）的场景。
+
+**Request Body（可选，`content-type: application/json`，用于 `POST`）：**
+
+```json
+{
+  "excludeIds": ["5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f", "6d9c4e2f-1b3a-4d8f-a7e0-2b3c4d5e6f7a"]
+}
+```
+
+**Response `200`：**
+
+- 当返回的帖子数量**达到 10 条**时，`message` 为 `success`
+- 当返回的帖子数量**不足 10 条**（数据库帖子里本来就少于 10 条，或排除 `excludeIds` 后剩余不足 10 条）时，`message` 为 `已无相关数据`，**但仍会在 `data` 中返回剩余的帖子**（可能为空数组 `[]`），客户端可据此停止下拉刷新/加载更多
+
+`data` 为一个**数组（列表）**，最多包含 10 条完整帖子对象（已排除 `excludeIds` 中的帖子），例如：
 
 ```json
 {
@@ -706,6 +724,8 @@ GET /api/posts/random
 说明：
 
 - `data` 是 **JSON 数组**，长度 ≤ 10（数据库中较新帖子不足 10 条时按实际数量返回）
+- 请求体 `excludeIds`（数组，`POST` 或 GET 的 `query` 参数）用于排除客户端**已获取**的帖子 ID；匹配到这些 ID 的帖子不会被返回
+- Android 端 Retrofit 请用 `POST /api/posts/random` 并在请求体中上传 `excludeIds`
 - 每条帖子的结构完全相同，Android 端可解析为 `List<Post>`
 - `sender` 为完整的用户信息对象；`medias` 为图片列表（可为空数组）；`likes` 为点赞用户列表（User 对象数组，可为空）；`comments` 为评论列表（可为空数组）
 

@@ -77,10 +77,27 @@ exports.getMyPosts = async (req, res) => {
 
 exports.getRandomPosts = async (req, res) => {
   try {
-    const posts = await findRandomRecentPosts(10);
+    // 客户端上传已获取的帖子 ID（数组），服务端将其从随机池中排除
+    let excludeIds = req.body && req.body.excludeIds;
+    if (!Array.isArray(excludeIds)) {
+      const raw = req.query && req.query.excludeIds;
+      if (raw) {
+        excludeIds = Array.isArray(raw) ? raw : String(raw).split(',').map((s) => s.trim());
+      }
+    }
+    excludeIds = (Array.isArray(excludeIds) ? excludeIds : [])
+      .filter((id) => typeof id === 'string' && id.trim() && /^[0-9a-fA-F-]{36}$/.test(id.trim()))
+      .map((id) => id.trim());
+
+    const LIMIT = 10;
+    const posts = await findRandomRecentPosts(LIMIT, excludeIds);
+
+    // 剩余帖子不足一条时，说明已无更多可获取的数据，message 提示客户端停止刷新/加载
+    const message = posts.length < LIMIT ? '已无相关数据' : 'success';
+
     res.json({
       code: 200,
-      message: 'success',
+      message,
       data: posts
     });
   } catch (error) {

@@ -1,4 +1,4 @@
-const { createPost, findAllPosts, findPostById, findPostsByUserId, findRandomRecentPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
+const { createPost, findAllPosts, findPostById, findPostsByUserId, findLikedPostsByUserId, findRandomRecentPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
 const { findById } = require('../models/user');
 
 exports.createPost = async (req, res) => {
@@ -72,6 +72,20 @@ exports.getMyPosts = async (req, res) => {
   } catch (error) {
     console.error('获取我的帖子错误:', error);
     res.status(500).json({ code: 500, message: '获取我的帖子失败' });
+  }
+};
+
+exports.getMyLikedPosts = async (req, res) => {
+  try {
+    const posts = await findLikedPostsByUserId(req.userId);
+    res.json({
+      code: 200,
+      message: 'success',
+      data: posts
+    });
+  } catch (error) {
+    console.error('获取我点赞的帖子错误:', error);
+    res.status(500).json({ code: 500, message: '获取我点赞的帖子失败' });
   }
 };
 

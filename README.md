@@ -783,6 +783,56 @@ GET /api/posts/my
 
 ---
 
+### 10.1 获取我点赞的帖子
+
+```
+GET /api/posts/myliked
+Authorization: Bearer <token>
+```
+
+**需要登录**，请求头携带 `Authorization: Bearer <token>`。返回当前登录用户**点赞过的所有帖子**，按创建时间倒序排列，结构与 `GET /api/posts/my` 完全相同（`data` 为完整帖子对象数组，可能为空数组）。查询依据是帖子 `likes` 字段（JSONB 用户 ID 列表）中是否包含当前用户 ID——即用户在 `POST /api/likes` 点赞过的帖子。**注意：此接口只能查询当前登录用户自己点过赞的帖子，不能传其他 `userId`**。
+
+**Response `200`：**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+      "title": "今天去了海边",
+      "content": "海边的日落真的很好看！",
+      "sender": {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123",
+        "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+        "bio": "热爱生活",
+        "join_time": "2024-01-01 00:00:00"
+      },
+      "medias": [],
+      "likes": [
+        {
+          "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          "account": "user123",
+          "username": "张三",
+          "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+        }
+      ],
+      "comments": [],
+      "time": "2024-01-01 00:00:00",
+      "created_at": "2024-01-01 00:00:00",
+      "updated_at": "2024-01-01 00:00:00"
+    }
+  ]
+}
+```
+
+说明：`token` 无效或缺失时返回 `401`。
+
+---
+
 ### 11. 获取用户信息
 
 ```

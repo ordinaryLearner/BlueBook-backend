@@ -223,6 +223,27 @@ const findPostsByUserId = async (userId) => {
   return attachCommentsToPosts(result.rows);
 };
 
+// 查询某用户点赞过的所有帖子（likes JSONB 数组中包含该用户 ID）
+const findLikedPostsByUserId = async (userId) => {
+  const result = await pool.query(`
+    SELECT p.*,
+      json_build_object(
+        'id', u.id,
+        'username', u.username,
+        'account', u.account,
+        'avatar', u.avatar,
+        'bio', u.bio,
+        'join_time', u.join_time
+      ) as sender
+    FROM posts p
+    JOIN users u ON p.sender_id = u.id
+    WHERE p.likes @> $1::jsonb
+    ORDER BY p.created_at DESC
+  `, [JSON.stringify([userId])]);
+
+  return attachCommentsToPosts(result.rows);
+};
+
 const findRandomRecentPosts = async (limit = 10, excludeIds = []) => {
   const ids = Array.isArray(excludeIds) ? excludeIds.filter(Boolean) : [];
   const result = await pool.query(`
@@ -329,6 +350,7 @@ module.exports = {
   findAllPosts,
   findPostById,
   findPostsByUserId,
+  findLikedPostsByUserId,
   findRandomRecentPosts,
   createComment,
   findCommentById,

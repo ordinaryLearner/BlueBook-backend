@@ -18,12 +18,12 @@ exports.getUserById = async (req, res) => {
   }
 };
 
-// ==================== 更新个人资料（用户名、头像、签名） ====================
+// ==================== 更新个人资料（用户名、头像、背景图、签名） ====================
 exports.updateProfile = async (req, res) => {
   try {
-    const { username, avatar, bio } = req.body;
+    const { username, avatar, background, bio } = req.body;
 
-    if (username === undefined && avatar === undefined && bio === undefined) {
+    if (username === undefined && avatar === undefined && background === undefined && bio === undefined) {
       return res.status(400).json({ code: 400, message: '没有需要更新的内容' });
     }
 
@@ -42,6 +42,7 @@ exports.updateProfile = async (req, res) => {
     const updatedUser = await updateProfile(req.userId, {
       username: username !== undefined ? String(username).trim() : undefined,
       avatar,
+      background,
       bio: bio !== undefined ? String(bio) : undefined
     });
     if (!updatedUser) {

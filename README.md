@@ -121,6 +121,7 @@ Content-Type: application/json
       "account": "user123",
       "username": "用户847251",
       "avatar": null,
+      "background": null,
       "bio": null,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -172,6 +173,7 @@ Content-Type: application/json
       "account": "user123",
       "username": "张三",
       "avatar": null,
+      "background": null,
       "bio": null,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -225,6 +227,7 @@ Content-Type: application/json
       "account": "user123",
       "username": "张三",
       "avatar": null,
+      "background": null,
       "bio": null,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -276,6 +279,7 @@ Content-Type: application/json
     "account": "user123",
     "username": "张三",
     "avatar": null,
+    "background": null,
     "bio": null,
     "join_time": "2024-01-01 00:00:00"
   }
@@ -334,6 +338,7 @@ Content-Type: application/json
       "username": "用户名",
       "account": "账号",
       "avatar": null,
+      "background": null,
       "bio": null,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -386,6 +391,7 @@ GET /api/posts
         "username": "张三",
         "account": "user123",
         "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+        "background": "https://i.ibb.co/xxx/background.jpg",
         "bio": "热爱生活",
         "join_time": "2024-01-01 00:00:00"
       },
@@ -495,6 +501,7 @@ GET /api/posts/:id
       "username": "张三",
       "account": "user123",
       "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+      "background": "https://i.ibb.co/xxx/background.jpg",
       "bio": "热爱生活",
       "join_time": "2024-01-01 00:00:00"
     },
@@ -641,6 +648,7 @@ POST /api/posts/random
         "username": "张三",
         "account": "user123",
         "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+        "background": "https://i.ibb.co/xxx/background.jpg",
         "bio": "热爱生活",
         "join_time": "2024-01-01 00:00:00"
       },
@@ -707,6 +715,7 @@ POST /api/posts/random
         "username": "李四",
         "account": "user456",
         "avatar": null,
+        "background": null,
         "bio": null,
         "join_time": "2024-01-02 00:00:00"
       },
@@ -765,6 +774,7 @@ GET /api/posts/my
         "username": "张三",
         "account": "user123",
         "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+        "background": "https://i.ibb.co/xxx/background.jpg",
         "bio": "热爱生活",
         "join_time": "2024-01-01 00:00:00"
       },
@@ -808,6 +818,7 @@ Authorization: Bearer <token>
         "username": "张三",
         "account": "user123",
         "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+        "background": "https://i.ibb.co/xxx/background.jpg",
         "bio": "热爱生活",
         "join_time": "2024-01-01 00:00:00"
       },
@@ -852,6 +863,7 @@ GET /api/users/:id
     "account": "user123",
     "username": "张三",
     "avatar": null,
+    "background": null,
     "bio": null,
     "join_time": "2024-01-01 00:00:00"
   }
@@ -874,7 +886,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
-需要登录。更新**当前登录用户**的用户名、头像和/或签名，用户身份以 token 为准（无法修改他人资料）。各字段均可省略，省略的字段保持原值，但至少需要提供一个。
+需要登录。更新**当前登录用户**的用户名、头像、主页背景图或签名，用户身份以 token 为准（无法修改他人资料）。各字段均可省略，省略的字段保持原值，但至少需要提供一个。
 
 **Request Body（JSON）：**
 
@@ -882,12 +894,14 @@ Content-Type: application/json
 |------|------|------|------|
 | `username` | string | 否 | 新用户名，不能为空串，最长 100 个字符，首尾空格会被去除 |
 | `avatar` | string | 否 | 头像图片 URL（客户端先上传图床获取 URL 后传入） |
+| `background` | string | 否 | 主页背景图 URL（客户端先上传图床获取 URL 后传入） |
 | `bio` | string | 否 | 个性签名，最长 200 个字符，传空串 `""` 可清空签名 |
 
 ```json
 {
   "username": "张三",
   "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+  "background": "https://i.ibb.co/xxx/background.jpg",
   "bio": "热爱生活，热爱记录"
 }
 ```
@@ -904,6 +918,7 @@ Content-Type: application/json
       "account": "user123",
       "username": "张三",
       "avatar": "https://i.ibb.co/xxx/avatar.jpg",
+      "background": "https://i.ibb.co/xxx/background.jpg",
       "bio": "热爱生活，热爱记录",
       "join_time": "2024-01-01 00:00:00"
     },
@@ -1066,6 +1081,7 @@ Content-Type: application/json
       "username": "用户名",
       "account": "账号",
       "avatar": null,
+      "background": null,
       "bio": null,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -1076,6 +1092,7 @@ Content-Type: application/json
         "account": "user456",
         "username": "李四",
         "avatar": null,
+        "background": null,
         "bio": null,
         "join_time": "2024-01-01 00:00:00"
       }
@@ -1112,6 +1129,7 @@ Content-Type: application/json
         "account": "user456",
         "username": "李四",
         "avatar": null,
+        "background": null,
         "bio": null,
         "join_time": "2024-01-01 00:00:00"
       }
@@ -1180,6 +1198,7 @@ Content-Type: application/json
       "username": "用户名",
       "account": "账号",
       "avatar": null,
+      "background": null,
       "bio": null,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -1234,6 +1253,7 @@ CREATE TABLE users (
   password   VARCHAR(255) NOT NULL,
   username   VARCHAR(100),
   avatar     TEXT,
+  background TEXT,
   bio        TEXT,
   join_time  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

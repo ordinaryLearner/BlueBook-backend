@@ -32,6 +32,7 @@ const initDatabase = async () => {
         password   VARCHAR(255) NOT NULL,
         username   VARCHAR(100),
         avatar     TEXT,
+        background TEXT,
         bio        TEXT,
         join_time  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -74,16 +75,16 @@ const initDatabase = async () => {
       )
     `);
 
+    // 兼容已存在的表：幂等补充 background 列，用于存储用户主页背景图
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS background TEXT
+    `);
+
     // 兼容已存在的表：幂等补充 parent_id 列，用于支持回复（嵌套评论）
     await pool.query(`
       ALTER TABLE comments
       ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES comments(id) ON DELETE CASCADE
-    `);
-
-    // 兼容已存在的表：幂等补充 receiver_id 列，用于记录回复中被回复的用户
-    await pool.query(`
-      ALTER TABLE comments
-      ADD COLUMN IF NOT EXISTS receiver_id UUID REFERENCES users(id)
     `);
 
     // 兼容已存在的表：likes 由 INT(点赞数)迁移为 JSONB(点赞用户 ID 列表)

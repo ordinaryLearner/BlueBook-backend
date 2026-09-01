@@ -22,7 +22,7 @@ const findByAccount = async (account) => {
 // 根据ID查找用户
 const findById = async (id) => {
   const result = await pool.query(
-    'SELECT id, account, username, avatar, bio, join_time FROM users WHERE id = $1',
+    'SELECT id, account, username, avatar, background, bio, join_time FROM users WHERE id = $1',
     [id]
   );
   return formatUser(result.rows[0] || null);
@@ -31,23 +31,24 @@ const findById = async (id) => {
 // 创建用户
 const createUser = async (account, password, username) => {
   const result = await pool.query(
-    'INSERT INTO users (account, password, username, join_time) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING id, account, username, avatar, bio, join_time',
+    'INSERT INTO users (account, password, username, join_time) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING id, account, username, avatar, background, bio, join_time',
     [account, password, username || account]
   );
   return formatUser(result.rows[0]);
 };
 
-// 更新用户资料（用户名、头像、签名），未提供的字段保持原值
-const updateProfile = async (id, { username, avatar, bio }) => {
+// 更新用户资料（用户名、头像、背景图、签名），未提供的字段保持原值
+const updateProfile = async (id, { username, avatar, background, bio }) => {
   const result = await pool.query(
     `UPDATE users
      SET username = COALESCE($1, username),
          avatar = COALESCE($2, avatar),
-         bio = COALESCE($3, bio),
+         background = COALESCE($3, background),
+         bio = COALESCE($4, bio),
          updated_at = CURRENT_TIMESTAMP
-     WHERE id = $4
-     RETURNING id, account, username, avatar, bio, join_time`,
-    [username ?? null, avatar ?? null, bio ?? null, id]
+     WHERE id = $5
+     RETURNING id, account, username, avatar, background, bio, join_time`,
+    [username ?? null, avatar ?? null, background ?? null, bio ?? null, id]
   );
   return formatUser(result.rows[0] || null);
 };

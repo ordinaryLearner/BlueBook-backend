@@ -244,6 +244,41 @@ const findLikedPostsByUserId = async (userId) => {
   return attachCommentsToPosts(result.rows);
 };
 
+// 根据关键字模糊搜索标题和内容，支持分页，返回 { list, total }
+const searchPosts = async (keyword, page = 1, pageSize = 10) => {
+  const limit = pageSize;
+  const offset = (page - 1) * pageSize;
+  const pattern = `%${keyword || ''}%`;
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total
+     FROM posts p
+     WHERE p.title ILIKE $1 OR p.content ILIKE $1`,
+    [pattern]
+  );
+  const total = countResult.rows[0].total;
+
+  const result = await pool.query(`
+    SELECT p.*,
+      json_build_object(
+        'id', u.id,
+        'username', u.username,
+        'account', u.account,
+        'avatar', u.avatar,
+        'bio', u.bio,
+        'join_time', u.join_time
+      ) as sender
+    FROM posts p
+    JOIN users u ON p.sender_id = u.id
+    WHERE p.title ILIKE $1 OR p.content ILIKE $1
+    ORDER BY p.created_at DESC
+    LIMIT $2 OFFSET $3
+  `, [pattern, limit, offset]);
+
+  const list = await attachCommentsToPosts(result.rows);
+  return { list, total };
+};
+
 const findRandomRecentPosts = async (limit = 10, excludeIds = []) => {
   const ids = Array.isArray(excludeIds) ? excludeIds.filter(Boolean) : [];
   const result = await pool.query(`
@@ -352,6 +387,7 @@ module.exports = {
   findPostsByUserId,
   findLikedPostsByUserId,
   findRandomRecentPosts,
+  searchPosts,
   createComment,
   findCommentById,
   findFullCommentById,

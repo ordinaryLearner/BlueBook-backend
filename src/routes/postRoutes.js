@@ -8,6 +8,8 @@ router.get('/my', authenticate, postController.getMyPosts);
 router.get('/myliked', authenticate, postController.getMyLikedPosts);
 router.get('/random', postController.getRandomPosts);
 router.post('/random', postController.getRandomPosts);
+router.get('/search', postController.searchPosts);
+router.post('/search', postController.searchPosts);
 router.get('/:id', postController.getPostById);
 
 module.exports = router;

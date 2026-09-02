@@ -750,6 +750,91 @@ POST /api/posts/random
 
 ---
 
+### 9.1 搜索帖子
+
+```
+GET /api/posts/search
+POST /api/posts/search
+```
+
+无需登录。客户端上传搜索信息（关键字），服务端在数据库中对帖子的 `title` 和 `content` 做**模糊匹配**（`ILIKE`，不区分大小写），按创建时间倒序返回匹配的帖子列表，并支持分页。
+
+**请求参数（`keyword` 必填，`page` / `pageSize` 可选）：**
+
+客户端可在 `query string`（GET）或 JSON 请求体（POST）中上传，两者取其一即可。
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `keyword` | string | 是 | 搜索关键字，匹配帖子的标题或正文 |
+| `page` | integer | 否 | 页码，从 1 开始，默认 `1` |
+| `pageSize` | integer | 否 | 每页条数，默认 `10`，最大 `50` |
+
+**Request（GET）：**
+
+```
+GET /api/posts/search?keyword=海边&page=1&pageSize=10
+```
+
+**Request（POST，`content-type: application/json`）：**
+
+```json
+{
+  "keyword": "海边",
+  "page": 1,
+  "pageSize": 10
+}
+```
+
+**Response `200`：** `data` 中 `list` 为匹配到的完整帖子对象数组（结构与 `GET /api/posts` 的元素一致，含 `sender` / `medias` / `likes` / `comments`），`total` 为匹配总条数，供客户端计算总页数。
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "list": [
+      {
+        "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+        "title": "今天去了海边",
+        "content": "海边的日落真的很好看！",
+        "sender": {
+          "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          "username": "张三",
+          "account": "user123",
+          "avatar": null,
+          "background": null,
+          "bio": null,
+          "join_time": "2024-01-01 00:00:00"
+        },
+        "medias": [],
+        "likes": [],
+        "comments": [],
+        "time": "2024-01-01 00:00:00",
+        "created_at": "2024-01-01 00:00:00",
+        "updated_at": "2024-01-01 00:00:00"
+      }
+    ],
+    "total": 3,
+    "page": 1,
+    "pageSize": 10
+  }
+}
+```
+
+说明：
+
+- `keyword` 为空字符串或仅包含空格时，等价于不设关键字，会返回全部帖子（按 `page`/`pageSize` 分页）
+- 无匹配结果时，`list` 为空数组 `[]`，`total` 为 `0`
+- `page` / `pageSize` 数值非法（小于 1 或非数字）时使用默认值，`pageSize` 超过 `50` 会被限制为 `50`
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 500 | 500 | 搜索失败，请稍后重试 |
+
+---
+
 ### 10. 获取当前用户的帖子
 
 ```

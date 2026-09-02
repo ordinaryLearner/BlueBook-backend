@@ -1,4 +1,4 @@
-const { createPost, findAllPosts, findPostById, findPostsByUserId, findLikedPostsByUserId, findRandomRecentPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
+const { createPost, findAllPosts, findPostById, findPostsByUserId, findLikedPostsByUserId, findRandomRecentPosts, searchPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
 const { findById } = require('../models/user');
 
 exports.createPost = async (req, res) => {
@@ -136,6 +136,37 @@ exports.getRandomPosts = async (req, res) => {
   } catch (error) {
     console.error('获取随机帖子错误:', error);
     res.status(500).json({ code: 500, message: '获取随机帖子失败' });
+  }
+};
+
+// 客户端上传搜索信息（关键字），服务端检索相关帖子并返回分页列表
+exports.searchPosts = async (req, res) => {
+  try {
+    const keyword = (req.body && req.body.keyword) || (req.query && req.query.keyword) || '';
+
+    // 支持客户端在 body 或 query string 中上传分页参数，缺省时使用默认值
+    let page = parseInt((req.body && req.body.page) ?? (req.query && req.query.page), 10);
+    let pageSize = parseInt((req.body && req.body.pageSize) ?? (req.query && req.query.pageSize), 10);
+
+    if (Number.isNaN(page) || page < 1) page = 1;
+    if (Number.isNaN(pageSize) || pageSize < 1) pageSize = 10;
+    if (pageSize > 50) pageSize = 50; // 防止单次拉取过大
+
+    const { list, total } = await searchPosts(keyword.trim(), page, pageSize);
+
+    res.json({
+      code: 200,
+      message: 'success',
+      data: {
+        list,
+        total,
+        page,
+        pageSize
+      }
+    });
+  } catch (error) {
+    console.error('搜索帖子错误:', error);
+    res.status(500).json({ code: 500, message: '搜索失败，请稍后重试' });
   }
 };
 

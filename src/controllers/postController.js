@@ -139,22 +139,62 @@ exports.getRandomPosts = async (req, res) => {
   }
 };
 
-// 客户端上传搜索信息（关键字），服务端检索相关帖子并返回分页列表
+// 从客户端上传的"已加载帖子"中提取帖子 id 数组用于排除。
+// 兼容完整 post 对象数组、字符串 id 数组、JSON 字符串或逗号分隔字符串，均归一化为合法 UUID 数组。
+const parseExcludePostIds = (value) => {
+  if (value == null) return [];
+
+  let list = value;
+
+  // 字符串：尝试 JSON 解析（可能整体是一个数组的序列化），否则按逗号切分
+  if (typeof list === 'string') {
+    const trimmed = list.trim();
+    if (trimmed.startsWith('[')) {
+      try { list = JSON.parse(trimmed); } catch (e) { list = trimmed; }
+    } else {
+      list = trimmed;
+    }
+  }
+
+  // 统一转成数组
+  if (!Array.isArray(list)) {
+    list = String(list).split(',').map((s) => s.trim()).filter(Boolean);
+  }
+
+  const extractId = (item) => {
+    if (item == null) return '';
+    // 完整 post 对象：取 id 字段
+    if (typeof item === 'object') {
+      const id = item.id ?? item.postId;
+      return typeof id === 'string' ? id.trim() : '';
+    }
+    // 直接是字符串 id
+    return String(item).trim();
+  };
+
+  return Array.from(list)
+    .map(extractId)
+    .filter((id) => UUID_RE.test(id));
+};
+
 exports.searchPosts = async (req, res) => {
   try {
     const keyword = (req.body && req.body.keyword) || (req.query && req.query.keyword) || '';
 
-    // 支持客户端在 body 或 query string 中上传分页参数，缺省时使用默认值
-    let page = parseInt((req.body && req.body.page) ?? (req.query && req.query.page), 10);
+    // 页大小：默认 10，最大 50（每次只返回一批，客户端累积排除后继续请求）
     let pageSize = parseInt((req.body && req.body.pageSize) ?? (req.query && req.query.pageSize), 10);
-
-    if (Number.isNaN(page) || page < 1) page = 1;
     if (Number.isNaN(pageSize) || pageSize < 1) pageSize = 10;
     if (pageSize > 50) pageSize = 50; // 防止单次拉取过大
 
-    const posts = await searchPosts(keyword.trim(), page, pageSize);
+    // 客户端上传"已选择/已加载"的帖子（完整 post 对象数组，可为 null/[]），
+    // 服务端排除这些帖子后返回"未选中的"匹配帖子
+    let excludePosts = req.body && (req.body.excludePosts ?? req.body.posts);
+    if (!excludePosts) excludePosts = req.query && (req.query.excludePosts ?? req.query.posts);
+    const excludeIds = parseExcludePostIds(excludePosts);
 
-    // 当前页数量 < pageSize 时说明已无更多，返回 NoMore 提示客户端停止翻页（与随机接口一致）
+    const posts = await searchPosts(keyword.trim(), pageSize, excludeIds);
+
+    // 返回数量 < pageSize 说明已没有更多未选帖子，message 置为 NoMore 提示客户端停止请求
     const message = posts.length < pageSize ? 'NoMore' : 'success';
 
     res.json({

@@ -753,39 +753,63 @@ POST /api/posts/random
 ### 9.1 搜索帖子
 
 ```
-GET /api/posts/search
 POST /api/posts/search
+GET /api/posts/search
 ```
 
-无需登录。客户端上传搜索信息（关键字），服务端在数据库中对帖子的 `title` 和 `content` 做**模糊匹配**（`ILIKE`，不区分大小写），按创建时间倒序返回匹配的帖子列表，并支持分页。`data` 与 `GET /api/posts`、`GET /api/posts/random` 一致，为**直接可解析成 `List<Post>` 的数组**。
+无需登录。客户端上传搜索信息（`keyword`）以及**已选择 / 已加载的帖子列表**（`excludePosts`，**可为空 `[]` 或 `null`**），服务端在数据库中对帖子的 `title` 和 `content` 做**模糊匹配**（`ILIKE`，不区分大小写），并**排除 `excludePosts` 中已经加载过的帖子**后，按创建时间倒序返回一批**未选中的**匹配帖子。`data` 与 `GET /api/posts`、`GET /api/posts/random` 一致，为**直接可解析成 `List<Post>` 的数组**。
 
-**请求参数（`keyword` 必填，`page` / `pageSize` 可选）：**
+> 该接口用于"搜索 + 加载更多 / 下拉刷新去重"：客户端把它当前屏幕已展示（已选择）的帖子**整体**传回，服务端据此不再重复返回这些帖子，从而保证同一批搜索中不产生重复结果。
 
-客户端可在 `query string`（GET）或 JSON 请求体（POST）中上传，两者取其一即可。Android 端 Retrofit 的 GET 请求无法携带请求体，因此建议使用 `POST /api/posts/search` 并携带 JSON 请求体。
+**请求参数（`keyword` 必填，`excludePosts` 可选、可为空，`pageSize` 可选）：**
+
+Android 端 Retrofit 的 GET 请求无法携带请求体（尤其无法携带数组对象），因此**请使用 `POST /api/posts/search`** 并携带 JSON 请求体；`GET` 仅保留用于轻量查询（通过 query 参数）。
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `keyword` | string | 是 | 搜索关键字，匹配帖子的标题或正文 |
-| `page` | integer | 否 | 页码，从 1 开始，默认 `1` |
-| `pageSize` | integer | 否 | 每页条数，默认 `10`，最大 `50` |
+| `excludePosts` | Post[] | 否，可空 | 客户端**已选择 / 已加载**的帖子列表（可为空数组或省略），服务端将排除其中每个帖子的 `id`；也兼容直接传字符串 id 数组或 JSON 字符串 |
+| `pageSize` | integer | 否 | 每批返回条数上限，默认 `10`，最大 `50` |
 
-**Request（GET）：**
-
-```
-GET /api/posts/search?keyword=海边&page=1&pageSize=10
-```
-
-**Request（POST，`content-type: application/json`）：**
+**Request（POST，`content-type: application/json`）——首次搜索（`excludePosts` 为空数组）：**
 
 ```json
 {
   "keyword": "海边",
-  "page": 1,
+  "excludePosts": [],
   "pageSize": 10
 }
 ```
 
-**Response `200`：** `data` 为匹配到的完整帖子对象数组（结构与 `GET /api/posts` 的元素一致，含 `sender` / `medias` / `likes` / `comments`），例如：
+**Request（POST）——加载更多 / 刷新去重：客户端把当前屏幕已展示的全部帖子传回，服务端返回未选中的下一批：**
+
+```json
+{
+  "keyword": "海边",
+  "excludePosts": [
+    {
+      "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+      "title": "今天去了海边"
+    },
+    {
+      "id": "6d9c4e2f-1b3a-4d8f-a7e0-2b3c4d5e6f7a",
+      "title": "海边野餐攻略"
+    }
+  ],
+  "pageSize": 10
+}
+```
+
+> 服务端只读取 `excludePosts` 中每个对象/字符串的帖子 `id` 用于排除，其余字段不参与匹配，因此客户端只需保证元素含有正确的 `id`（传完整 Post 对象亦可）。
+
+**Request（GET）：**
+
+```
+GET /api/posts/search?keyword=海边&pageSize=10
+# 排除指定 id：?keyword=海边&excludePosts=5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f
+```
+
+**Response `200`：** `data` 为排除 `excludePosts` 后匹配到的完整帖子对象数组（结构与 `GET /api/posts` 的元素一致，含 `sender` / `medias` / `likes` / `comments`），例如：
 
 ```json
 {
@@ -836,7 +860,7 @@ GET /api/posts/search?keyword=海边&page=1&pageSize=10
 }
 ```
 
-**分页约定（与 `GET /api/posts/random` / `GET /api/posts` 一致）：** `data` 为一个**数组（列表）**，最多包含 `pageSize` 条（默认 10）帖子，顺序为创建时间倒序。客户端通过递增 `page`（每次请求 `page + 1`）向下翻页加载更多；当**当前页返回的帖子数量不足 `pageSize`**（即已没有更多数据）时，返回的 `message` 为 `NoMore`、且 `data` 含剩余的帖子（可能为空数组 `[]`），客户端应据此停止翻页：
+**去重 / 分页约定（思路与 `GET /api/posts/random` 一致）：** `data` 为一个**数组（列表）**，最多包含 `pageSize` 条（默认 10）**未被客户端上传过**的匹配帖子，顺序按创建时间倒序。客户端**累积**地把已展示的帖子加入 `excludePosts` 再次请求即可不断取得"未选中的"下一批；当返回的帖子数量**不足 `pageSize`**（即已没有更多未选中的匹配帖子）时，返回的 `message` 为 `NoMore`、且 `data` 含剩余的帖子（可能为空数组 `[]`），客户端应据此停止加载更多：
 
 ```json
 {
@@ -848,9 +872,11 @@ GET /api/posts/search?keyword=海边&page=1&pageSize=10
 
 说明：
 
-- `keyword` 为空字符串或仅包含空格时，等价于不设关键字，会返回全部帖子（仍按 `page`/`pageSize` 分页）
-- 无匹配结果时，`data` 为空数组 `[]`，`message` 为 `NoMore`
-- `page` / `pageSize` 数值非法（小于 1 或非数字）时使用默认值，`pageSize` 超过 `50` 会被限制为 `50`
+- `keyword` 为空字符串或仅包含空格时，等价于**不设关键字**，会返回全部帖子（仍会排除 `excludePosts`，并按 `pageSize` 分批）
+- `excludePosts` 可省略、可为空数组 `[]` 或 `null`，此时等价于不排除任何帖子
+- 无任何未选中的匹配帖子时，`data` 为空数组 `[]`，`message` 为 `NoMore`
+- `pageSize` 数值非法（小于 1 或非数字）时使用默认值 `10`，超过 `50` 会被限制为 `50`
+- 说明：通过把"当前已展示的帖子"累积传回 `excludePosts`，同一关键词的连续请求不会返回重复帖子；若更换关键词，请清空 `excludePosts` 重新从第一批加载
 
 **错误码：**
 

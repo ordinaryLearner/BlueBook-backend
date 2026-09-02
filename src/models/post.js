@@ -244,10 +244,9 @@ const findLikedPostsByUserId = async (userId) => {
   return attachCommentsToPosts(result.rows);
 };
 
-// 根据关键字模糊搜索标题和内容，支持分页；返回匹配的帖子数组（一页），翻页直到数组为空即无更多
-const searchPosts = async (keyword, page = 1, pageSize = 10) => {
-  const limit = pageSize;
-  const offset = (page - 1) * pageSize;
+// 模糊搜索标题和内容，排除客户端已上传的(已加载)帖子后，按创建时间倒序取一页匹配的帖子
+const searchPosts = async (keyword, limit = 10, excludeIds = []) => {
+  const ids = Array.isArray(excludeIds) ? excludeIds.filter(Boolean) : [];
   const pattern = `%${keyword || ''}%`;
 
   const result = await pool.query(`
@@ -262,10 +261,11 @@ const searchPosts = async (keyword, page = 1, pageSize = 10) => {
       ) as sender
     FROM posts p
     JOIN users u ON p.sender_id = u.id
-    WHERE p.title ILIKE $1 OR p.content ILIKE $1
+    WHERE (p.title ILIKE $1 OR p.content ILIKE $1)
+      AND (($2::uuid[] IS NULL) OR NOT (p.id = ANY($2::uuid[])))
     ORDER BY p.created_at DESC
-    LIMIT $2 OFFSET $3
-  `, [pattern, limit, offset]);
+    LIMIT $3
+  `, [pattern, ids.length > 0 ? ids : null, limit]);
 
   return attachCommentsToPosts(result.rows);
 };

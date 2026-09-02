@@ -757,11 +757,11 @@ GET /api/posts/search
 POST /api/posts/search
 ```
 
-无需登录。客户端上传搜索信息（关键字），服务端在数据库中对帖子的 `title` 和 `content` 做**模糊匹配**（`ILIKE`，不区分大小写），按创建时间倒序返回匹配的帖子列表，并支持分页。
+无需登录。客户端上传搜索信息（关键字），服务端在数据库中对帖子的 `title` 和 `content` 做**模糊匹配**（`ILIKE`，不区分大小写），按创建时间倒序返回匹配的帖子列表，并支持分页。`data` 与 `GET /api/posts`、`GET /api/posts/random` 一致，为**直接可解析成 `List<Post>` 的数组**。
 
 **请求参数（`keyword` 必填，`page` / `pageSize` 可选）：**
 
-客户端可在 `query string`（GET）或 JSON 请求体（POST）中上传，两者取其一即可。
+客户端可在 `query string`（GET）或 JSON 请求体（POST）中上传，两者取其一即可。Android 端 Retrofit 的 GET 请求无法携带请求体，因此建议使用 `POST /api/posts/search` 并携带 JSON 请求体。
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -785,46 +785,71 @@ GET /api/posts/search?keyword=海边&page=1&pageSize=10
 }
 ```
 
-**Response `200`：** `data` 中 `list` 为匹配到的完整帖子对象数组（结构与 `GET /api/posts` 的元素一致，含 `sender` / `medias` / `likes` / `comments`），`total` 为匹配总条数，供客户端计算总页数。
+**Response `200`：** `data` 为匹配到的完整帖子对象数组（结构与 `GET /api/posts` 的元素一致，含 `sender` / `medias` / `likes` / `comments`），例如：
 
 ```json
 {
   "code": 200,
   "message": "success",
-  "data": {
-    "list": [
-      {
-        "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
-        "title": "今天去了海边",
-        "content": "海边的日落真的很好看！",
-        "sender": {
-          "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-          "username": "张三",
-          "account": "user123",
-          "avatar": null,
-          "background": null,
-          "bio": null,
-          "join_time": "2024-01-01 00:00:00"
-        },
-        "medias": [],
-        "likes": [],
-        "comments": [],
-        "time": "2024-01-01 00:00:00",
-        "created_at": "2024-01-01 00:00:00",
-        "updated_at": "2024-01-01 00:00:00"
-      }
-    ],
-    "total": 3,
-    "page": 1,
-    "pageSize": 10
-  }
+  "data": [
+    {
+      "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+      "title": "今天去了海边",
+      "content": "海边的日落真的很好看！",
+      "sender": {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123",
+        "avatar": null,
+        "background": null,
+        "bio": null,
+        "join_time": "2024-01-01 00:00:00"
+      },
+      "medias": [],
+      "likes": [],
+      "comments": [],
+      "time": "2024-01-01 00:00:00",
+      "created_at": "2024-01-01 00:00:00",
+      "updated_at": "2024-01-01 00:00:00"
+    },
+    {
+      "id": "6d9c4e2f-1b3a-4d8f-a7e0-2b3c4d5e6f7a",
+      "title": "海边野餐攻略",
+      "content": "收藏这份海边野餐清单",
+      "sender": {
+        "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        "username": "李四",
+        "account": "user456",
+        "avatar": null,
+        "background": null,
+        "bio": null,
+        "join_time": "2024-01-02 00:00:00"
+      },
+      "medias": [],
+      "likes": [],
+      "comments": [],
+      "time": "2024-01-02 00:00:00",
+      "created_at": "2024-01-02 00:00:00",
+      "updated_at": "2024-01-02 00:00:00"
+    }
+  ]
+}
+```
+
+**分页约定（与 `GET /api/posts/random` / `GET /api/posts` 一致）：** `data` 为一个**数组（列表）**，最多包含 `pageSize` 条（默认 10）帖子，顺序为创建时间倒序。客户端通过递增 `page`（每次请求 `page + 1`）向下翻页加载更多；当**当前页返回的帖子数量不足 `pageSize`**（即已没有更多数据）时，返回的 `message` 为 `NoMore`、且 `data` 含剩余的帖子（可能为空数组 `[]`），客户端应据此停止翻页：
+
+```json
+{
+  "code": 200,
+  "message": "NoMore",
+  "data": []
 }
 ```
 
 说明：
 
-- `keyword` 为空字符串或仅包含空格时，等价于不设关键字，会返回全部帖子（按 `page`/`pageSize` 分页）
-- 无匹配结果时，`list` 为空数组 `[]`，`total` 为 `0`
+- `keyword` 为空字符串或仅包含空格时，等价于不设关键字，会返回全部帖子（仍按 `page`/`pageSize` 分页）
+- 无匹配结果时，`data` 为空数组 `[]`，`message` 为 `NoMore`
 - `page` / `pageSize` 数值非法（小于 1 或非数字）时使用默认值，`pageSize` 超过 `50` 会被限制为 `50`
 
 **错误码：**

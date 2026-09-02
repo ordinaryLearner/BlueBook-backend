@@ -244,19 +244,11 @@ const findLikedPostsByUserId = async (userId) => {
   return attachCommentsToPosts(result.rows);
 };
 
-// 根据关键字模糊搜索标题和内容，支持分页，返回 { list, total }
+// 根据关键字模糊搜索标题和内容，支持分页；返回匹配的帖子数组（一页），翻页直到数组为空即无更多
 const searchPosts = async (keyword, page = 1, pageSize = 10) => {
   const limit = pageSize;
   const offset = (page - 1) * pageSize;
   const pattern = `%${keyword || ''}%`;
-
-  const countResult = await pool.query(
-    `SELECT COUNT(*)::int AS total
-     FROM posts p
-     WHERE p.title ILIKE $1 OR p.content ILIKE $1`,
-    [pattern]
-  );
-  const total = countResult.rows[0].total;
 
   const result = await pool.query(`
     SELECT p.*,
@@ -275,8 +267,7 @@ const searchPosts = async (keyword, page = 1, pageSize = 10) => {
     LIMIT $2 OFFSET $3
   `, [pattern, limit, offset]);
 
-  const list = await attachCommentsToPosts(result.rows);
-  return { list, total };
+  return attachCommentsToPosts(result.rows);
 };
 
 const findRandomRecentPosts = async (limit = 10, excludeIds = []) => {

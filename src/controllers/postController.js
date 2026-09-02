@@ -152,17 +152,15 @@ exports.searchPosts = async (req, res) => {
     if (Number.isNaN(pageSize) || pageSize < 1) pageSize = 10;
     if (pageSize > 50) pageSize = 50; // 防止单次拉取过大
 
-    const { list, total } = await searchPosts(keyword.trim(), page, pageSize);
+    const posts = await searchPosts(keyword.trim(), page, pageSize);
+
+    // 当前页数量 < pageSize 时说明已无更多，返回 NoMore 提示客户端停止翻页（与随机接口一致）
+    const message = posts.length < pageSize ? 'NoMore' : 'success';
 
     res.json({
       code: 200,
-      message: 'success',
-      data: {
-        list,
-        total,
-        page,
-        pageSize
-      }
+      message,
+      data: posts
     });
   } catch (error) {
     console.error('搜索帖子错误:', error);

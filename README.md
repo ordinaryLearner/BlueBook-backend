@@ -123,6 +123,9 @@ Content-Type: application/json
       "avatar": null,
       "background": null,
       "bio": null,
+      "followers": [],
+      "fans": [],
+      "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
     "token": "eyJhbGciOiJIUzI1NiIs..."
@@ -175,6 +178,9 @@ Content-Type: application/json
       "avatar": null,
       "background": null,
       "bio": null,
+      "followers": [],
+      "fans": [],
+      "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
     "token": "eyJhbGciOiJIUzI1NiIs..."
@@ -229,6 +235,9 @@ Content-Type: application/json
       "avatar": null,
       "background": null,
       "bio": null,
+      "followers": [],
+      "fans": [],
+      "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
     "token": "eyJhbGciOiJIUzI1NiIs..."
@@ -281,6 +290,9 @@ Content-Type: application/json
     "avatar": null,
     "background": null,
     "bio": null,
+    "followers": [],
+    "fans": [],
+    "totalLikes": 0,
     "join_time": "2024-01-01 00:00:00"
   }
 }
@@ -988,6 +1000,23 @@ GET /api/users/:id
 
 无需登录。根据用户 ID 查询用户基本信息，可用于从帖子 `sender.id` 获取发送者的详细信息。
 
+返回的 User 对象通用字段如下：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string | 用户 ID |
+| `account` | string | 登录账号 |
+| `username` | string | 昵称 |
+| `avatar` | string \| null | 头像图片 URL |
+| `background` | string \| null | 主页背景图 URL |
+| `bio` | string \| null | 个性签名 |
+| `followers` | User[] | 关注列表（该用户主动关注的用户对象数组） |
+| `fans` | User[] | 粉丝列表（关注该用户的用户对象数组） |
+| `totalLikes` | number | 该用户所有帖子收到的点赞总数（各帖 `likes` 数组长度之和，仅统计帖子） |
+| `join_time` | string | 注册时间 |
+
+每个 `followers` / `fans` 元素都是精简的 User 对象（`id` / `account` / `username` / `avatar` / `bio` / `join_time`）。
+
 **Response `200`：**
 
 ```json
@@ -1001,6 +1030,18 @@ GET /api/users/:id
     "avatar": null,
     "background": null,
     "bio": null,
+    "followers": [
+      {
+        "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        "account": "user456",
+        "username": "李四",
+        "avatar": null,
+        "bio": null,
+        "join_time": "2024-01-01 00:00:00"
+      }
+    ],
+    "fans": [],
+    "totalLikes": 0,
     "join_time": "2024-01-01 00:00:00"
   }
 }
@@ -1011,6 +1052,76 @@ GET /api/users/:id
 | 状态码 | code | message |
 |--------|------|---------|
 | 404 | 404 | 用户不存在 |
+
+---
+
+### 11.1 关注用户
+
+```
+POST /api/users/:id/follow
+Authorization: Bearer <token>
+```
+
+需要登录。让当前登录用户关注 `:id` 指定的用户。效果：当前用户 `followers`（关注列表）新增目标，目标用户 `fans` 新增当前用户。
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | 不能关注自己 |
+| 400 | 400 | 已关注该用户 |
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 404 | 404 | 用户不存在 |
+| 500 | 500 | 关注失败 |
+
+---
+
+### 11.2 取消关注
+
+```
+DELETE /api/users/:id/follow
+Authorization: Bearer <token>
+```
+
+需要登录。取消当前登录用户对 `:id` 用户的关注，并从目标用户的 `fans` 中移除当前用户。
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | 未关注该用户 |
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 500 | 500 | 取消关注失败 |
+
+---
+
+### 11.3 查询是否已关注
+
+```
+GET /api/users/:id/follow/status
+Authorization: Bearer <token>
+```
+
+需要登录。查询当前登录用户是否已关注 `:id` 用户。
+
+**Response `200`：**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "following": false
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 500 | 500 | 查询关注状态失败 |
 
 ---
 
@@ -1056,6 +1167,9 @@ Content-Type: application/json
       "avatar": "https://i.ibb.co/xxx/avatar.jpg",
       "background": "https://i.ibb.co/xxx/background.jpg",
       "bio": "热爱生活，热爱记录",
+      "followers": [],
+      "fans": [],
+      "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
     "token": "eyJhbGciOiJIUzI1NiIs..."
@@ -1391,6 +1505,8 @@ CREATE TABLE users (
   avatar     TEXT,
   background TEXT,
   bio        TEXT,
+  followers  JSONB DEFAULT '[]'::jsonb,
+  fans       JSONB DEFAULT '[]'::jsonb,
   join_time  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -34,10 +34,20 @@ const initDatabase = async () => {
         avatar     TEXT,
         background TEXT,
         bio        TEXT,
+        followers  JSONB DEFAULT '[]'::jsonb,
+        fans       JSONB DEFAULT '[]'::jsonb,
         join_time  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // 兼容已存在的表：幂等补充一键三连关注列，用于存储关注关系
+    // followers = 该用户主动关注的用户 ID 列表（关注列表）；fans = 该用户的粉丝 ID 列表
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS followers JSONB DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS fans JSONB DEFAULT '[]'::jsonb
     `);
 
     await pool.query(`

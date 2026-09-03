@@ -1,6 +1,30 @@
-﻿// src/models/user.js
+// src/models/user.js
 const { pool } = require('../config/database');
 const { formatTime } = require('../utils/time');
+
+// 对外暴露的用户非敏感字段（密码一律不返回）
+const PUBLIC_COLUMNS = `
+  id, account, username, avatar, background, bio,
+  followers, fans, join_time
+`;
+
+// 将某个用户详情（跟随列表/粉丝列表）中出现的用户 ID 数组展开为完整 User 对象列表
+const resolveIds = async (ids) => {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+  const result = await pool.query(`
+    SELECT id, account, username, avatar, bio, join_time
+    FROM users
+    WHERE id = ANY($1::uuid[])
+  `, [ids]);
+  const byId = new Map(result.rows.map((u) => [u.id, u]));
+  // 过滤掉已删除/不存在的 ID，保证返回的是有效 User 对象
+  return ids.map((id) => {
+    const u = byId.get(id);
+    if (!u) return null;
+    if (u.join_time) u.join_time = formatTime(u.join_time);
+    return u;
+  }).filter(Boolean);
+};
 
 const formatUser = (row) => {
   if (!row) return null;
@@ -10,31 +34,65 @@ const formatUser = (row) => {
   return row;
 };
 
+// 把 followers/fans 两个 JSONB(用户ID数组) 字段替换成各自对应的 User 对象列表
+const attachFollowLists = async (row) => {
+  if (!row) return null;
+  const [followers, fans] = await Promise.all([
+    resolveIds(row.followers),
+    resolveIds(row.fans)
+  ]);
+  row.followers = followers;
+  row.fans = fans;
+  return row;
+};
+
+// 计算该用户所有帖子收到的点赞总数（每帖 likes 数组长度之和）
+const computeTotalLikes = async (userId) => {
+  const result = await pool.query(`
+    SELECT COALESCE(SUM(jsonb_array_length(COALESCE(likes, '[]'::jsonb))), 0)::int AS total
+    FROM posts
+    WHERE sender_id = $1
+  `, [userId]);
+  return Number(result.rows[0]?.total) || 0;
+};
+
+// 统一的用户资料富化：展开关注/粉丝列表，并附上收到的点赞总数
+const enrichProfile = async (row) => {
+  const user = await attachFollowLists(row);
+  if (!user) return null;
+  user.totalLikes = await computeTotalLikes(user.id);
+  return user;
+};
+
 // 根据账号查找用户
 const findByAccount = async (account) => {
   const result = await pool.query(
     'SELECT * FROM users WHERE account = $1',
     [account]
   );
-  return formatUser(result.rows[0] || null);
+  const user = formatUser(result.rows[0] || null);
+  // 富化用户资料，保证各接口返回一致（关注/粉丝列表 + 点赞总数）
+  return enrichProfile(user);
 };
 
 // 根据ID查找用户
 const findById = async (id) => {
   const result = await pool.query(
-    'SELECT id, account, username, avatar, background, bio, join_time FROM users WHERE id = $1',
+    `SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = $1`,
     [id]
   );
-  return formatUser(result.rows[0] || null);
+  const user = formatUser(result.rows[0] || null);
+  return enrichProfile(user);
 };
 
 // 创建用户
 const createUser = async (account, password, username) => {
   const result = await pool.query(
-    'INSERT INTO users (account, password, username, join_time) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING id, account, username, avatar, background, bio, join_time',
+    `INSERT INTO users (account, password, username, join_time) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+     RETURNING ${PUBLIC_COLUMNS}`,
     [account, password, username || account]
   );
-  return formatUser(result.rows[0]);
+  return enrichProfile(formatUser(result.rows[0]));
 };
 
 // 更新用户资料（用户名、头像、背景图、签名），未提供的字段保持原值
@@ -47,10 +105,74 @@ const updateProfile = async (id, { username, avatar, background, bio }) => {
          bio = COALESCE($4, bio),
          updated_at = CURRENT_TIMESTAMP
      WHERE id = $5
-     RETURNING id, account, username, avatar, background, bio, join_time`,
+     RETURNING ${PUBLIC_COLUMNS}`,
     [username ?? null, avatar ?? null, background ?? null, bio ?? null, id]
   );
-  return formatUser(result.rows[0] || null);
+  const user = formatUser(result.rows[0] || null);
+  return enrichProfile(user);
 };
 
-module.exports = { findByAccount, findById, createUser, updateProfile };
+// 关注用户：把 targetId 加入自己的 followers（关注列表），并把 followById 加入目标用户的 fans
+const followUser = async (followById, targetId) => {
+  await pool.query(`
+    UPDATE users
+    SET followers = CASE WHEN followers @> $1::jsonb THEN followers ELSE followers || $1::jsonb END,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+  `, [JSON.stringify([targetId]), followById]);
+  await pool.query(`
+    UPDATE users
+    SET fans = CASE WHEN fans @> $1::jsonb THEN fans ELSE fans || $1::jsonb END,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+  `, [JSON.stringify([followById]), targetId]);
+};
+
+// 取关用户：从自己 followers（关注列表）与目标用户 fans 中移除对应 ID
+const unfollowUser = async (followById, targetId) => {
+  await pool.query(`
+    UPDATE users
+    SET followers = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+                     FROM jsonb_array_elements(followers) elem
+                     WHERE elem::text <> $1),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+  `, [JSON.stringify(targetId), followById]);
+  await pool.query(`
+    UPDATE users
+    SET fans = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+                FROM jsonb_array_elements(fans) elem
+                WHERE elem::text <> $1),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $2
+  `, [JSON.stringify(followById), targetId]);
+};
+
+// 判断是否已关注目标用户
+const isFollowing = async (userId, targetId) => {
+  const result = await pool.query(
+    `SELECT followers FROM users WHERE id = $1`,
+    [userId]
+  );
+  const followers = result.rows[0]?.followers || [];
+  return Array.isArray(followers)
+    ? followers.some((id) => id === targetId)
+    : false;
+};
+
+// 轻量存在性校验（用于鉴权中间件，避免解析关注列表带来的开销）
+const userExists = async (id) => {
+  const result = await pool.query('SELECT 1 FROM users WHERE id = $1', [id]);
+  return result.rows.length > 0;
+};
+
+module.exports = {
+  findByAccount,
+  findById,
+  createUser,
+  updateProfile,
+  followUser,
+  unfollowUser,
+  isFollowing,
+  userExists
+};

@@ -1,4 +1,4 @@
-const { findById, updateProfile } = require('../models/user');
+const { findById, updateProfile, followUser, unfollowUser, isFollowing } = require('../models/user');
 const { generateToken } = require('../utils/token');
 
 exports.getUserById = async (req, res) => {
@@ -62,3 +62,60 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({ code: 500, message: '更新个人资料失败' });
   }
 };
+
+// ==================== 关注用户 ====================
+exports.follow = async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const userId = req.userId;
+
+    if (userId === targetId) {
+      return res.status(400).json({ code: 400, message: '不能关注自己' });
+    }
+
+    const target = await findById(targetId);
+    if (!target) {
+      return res.status(404).json({ code: 404, message: '用户不存在' });
+    }
+
+    if (await isFollowing(userId, targetId)) {
+      return res.status(400).json({ code: 400, message: '已关注该用户' });
+    }
+
+    await followUser(userId, targetId);
+    res.json({ code: 200, message: '关注成功' });
+  } catch (error) {
+    console.error('关注用户错误:', error);
+    res.status(500).json({ code: 500, message: '关注失败' });
+  }
+};
+
+// ==================== 取消关注 ====================
+exports.unfollow = async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const userId = req.userId;
+
+    if (!(await isFollowing(userId, targetId))) {
+      return res.status(400).json({ code: 400, message: '未关注该用户' });
+    }
+
+    await unfollowUser(userId, targetId);
+    res.json({ code: 200, message: '取消关注成功' });
+  } catch (error) {
+    console.error('取消关注错误:', error);
+    res.status(500).json({ code: 500, message: '取消关注失败' });
+  }
+};
+
+// ==================== 查询是否关注了某用户 ====================
+exports.followStatus = async (req, res) => {
+  try {
+    const following = await isFollowing(req.userId, req.params.id);
+    res.json({ code: 200, message: 'success', data: { following } });
+  } catch (error) {
+    console.error('查询关注状态错误:', error);
+    res.status(500).json({ code: 500, message: '查询关注状态失败' });
+  }
+};
+

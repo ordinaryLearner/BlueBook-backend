@@ -1,6 +1,6 @@
 ﻿// src/middleware/auth.js
 const jwt = require('jsonwebtoken');
-const { findById } = require('../models/user');
+const { userExists } = require('../models/user');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'bluebook-super-secret-key-2024';
 
@@ -21,14 +21,13 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ code: 401, message: 'Token无效或已过期' });
     }
 
-    const user = await findById(decoded.userId);
-    
-    if (!user) {
+    // 轻量校验用户仍存在，避免每个认证请求都做关注列表的联表开销
+    if (!(await userExists(decoded.userId))) {
       return res.status(401).json({ code: 401, message: '用户不存在' });
     }
 
-    req.user = user;
-    req.userId = user.id;
+    req.userId = decoded.userId;
+    req.user = { id: decoded.userId };
     
     next();
   } catch (error) {

@@ -8,41 +8,11 @@ const PUBLIC_COLUMNS = `
   followers, fans, join_time
 `;
 
-// 将某个用户详情（跟随列表/粉丝列表）中出现的用户 ID 数组展开为完整 User 对象列表
-const resolveIds = async (ids) => {
-  if (!Array.isArray(ids) || ids.length === 0) return [];
-  const result = await pool.query(`
-    SELECT id, account, username, avatar, bio, join_time
-    FROM users
-    WHERE id = ANY($1::uuid[])
-  `, [ids]);
-  const byId = new Map(result.rows.map((u) => [u.id, u]));
-  // 过滤掉已删除/不存在的 ID，保证返回的是有效 User 对象
-  return ids.map((id) => {
-    const u = byId.get(id);
-    if (!u) return null;
-    if (u.join_time) u.join_time = formatTime(u.join_time);
-    return u;
-  }).filter(Boolean);
-};
-
 const formatUser = (row) => {
   if (!row) return null;
   if (row.join_time) row.join_time = formatTime(row.join_time);
   if (row.created_at) row.created_at = formatTime(row.created_at);
   if (row.updated_at) row.updated_at = formatTime(row.updated_at);
-  return row;
-};
-
-// 把 followers/fans 两个 JSONB(用户ID数组) 字段替换成各自对应的 User 对象列表
-const attachFollowLists = async (row) => {
-  if (!row) return null;
-  const [followers, fans] = await Promise.all([
-    resolveIds(row.followers),
-    resolveIds(row.fans)
-  ]);
-  row.followers = followers;
-  row.fans = fans;
   return row;
 };
 
@@ -56,10 +26,13 @@ const computeTotalLikes = async (userId) => {
   return Number(result.rows[0]?.total) || 0;
 };
 
-// 统一的用户资料富化：展开关注/粉丝列表，并附上收到的点赞总数
+// 统一的用户资料富化：把关注/粉丝改为主粒度数量（Int），并附上收到的点赞总数
 const enrichProfile = async (row) => {
-  const user = await attachFollowLists(row);
+  const user = formatUser(row);
   if (!user) return null;
+  // followers/fans 列存的是 JSONB(用户ID数组)，对外只暴露数量
+  user.followers = Array.isArray(user.followers) ? user.followers.length : 0;
+  user.fans = Array.isArray(user.fans) ? user.fans.length : 0;
   user.totalLikes = await computeTotalLikes(user.id);
   return user;
 };
@@ -166,6 +139,53 @@ const userExists = async (id) => {
   return result.rows.length > 0;
 };
 
+// 将一组用户 ID 还原为精简的 User 对象（不递归展开关注/粉丝，避免循环与开销），顺序与 ids 一致
+const idsToUsers = async (ids) => {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+  const result = await pool.query(`
+    SELECT id, account, username, avatar, bio, join_time
+    FROM users
+    WHERE id = ANY($1::uuid[])
+  `, [ids]);
+  const byId = new Map(result.rows.map((u) => [u.id, u]));
+  return ids.map((id) => {
+    const u = byId.get(id);
+    if (!u) return null;
+    if (u.join_time) u.join_time = formatTime(u.join_time);
+    return u;
+  }).filter(Boolean);
+};
+
+// 分页取出某用户的关键列表（kind: 'followers' 关注列表 / 'fans' 粉丝列表），每次最多 pageSize（上限 30）
+const listFollows = async (userId, kind, page = 1, pageSize = 30) => {
+  if (!['followers', 'fans'].includes(kind)) {
+    throw new Error('kind 必须是 followers 或 fans');
+  }
+  page = Math.max(1, Math.floor(page) || 1);
+  const limit = Math.min(Math.max(1, Math.floor(pageSize) || 30), 30);
+
+  const result = await pool.query(
+    `SELECT followers, fans FROM users WHERE id = $1`,
+    [userId]
+  );
+  const row = result.rows[0];
+  if (!row) return null; // 用户不存在
+
+  const all = Array.isArray(row[kind]) ? row[kind] : [];
+  const total = all.length;
+  const offset = (page - 1) * limit;
+  const slice = all.slice(offset, offset + limit);
+  const users = await idsToUsers(slice);
+
+  return {
+    total,
+    page,
+    pageSize: limit,
+    hasMore: offset + slice.length < total,
+    users
+  };
+};
+
 module.exports = {
   findByAccount,
   findById,
@@ -174,5 +194,6 @@ module.exports = {
   followUser,
   unfollowUser,
   isFollowing,
-  userExists
+  userExists,
+  listFollows
 };

@@ -10,4 +10,8 @@ router.post('/:id/follow', authenticate, userController.follow);
 router.delete('/:id/unfollow', authenticate, userController.unfollow);
 router.get('/:id/follow/status', authenticate, userController.followStatus);
 
+// 分页获取关注/粉丝列表
+router.get('/:id/following', userController.getFollowingList);
+router.get('/:id/fans', userController.getFansList);
+
 module.exports = router;

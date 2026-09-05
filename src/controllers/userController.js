@@ -1,4 +1,4 @@
-const { findById, updateProfile, followUser, unfollowUser, isFollowing } = require('../models/user');
+const { findById, updateProfile, followUser, unfollowUser, isFollowing, listFollows } = require('../models/user');
 const { generateToken } = require('../utils/token');
 
 exports.getUserById = async (req, res) => {
@@ -116,6 +116,48 @@ exports.followStatus = async (req, res) => {
   } catch (error) {
     console.error('查询关注状态错误:', error);
     res.status(500).json({ code: 500, message: '查询关注状态失败' });
+  }
+};
+
+// ==================== 分页获取某用户的关注列表（我主动关注的 User） ====================
+exports.getFollowingList = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page, 10);
+    const pageSize = parseInt(req.query.pageSize, 10);
+    const data = await listFollows(
+      req.params.id,
+      'followers',
+      Number.isNaN(page) ? 1 : page,
+      Number.isNaN(pageSize) ? 30 : pageSize
+    );
+    if (!data) {
+      return res.status(404).json({ code: 404, message: '用户不存在' });
+    }
+    res.json({ code: 200, message: 'success', data });
+  } catch (error) {
+    console.error('获取关注列表错误:', error);
+    res.status(500).json({ code: 500, message: '获取关注列表失败' });
+  }
+};
+
+// ==================== 分页获取某用户的粉丝列表（关注该用户的 User） ====================
+exports.getFansList = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page, 10);
+    const pageSize = parseInt(req.query.pageSize, 10);
+    const data = await listFollows(
+      req.params.id,
+      'fans',
+      Number.isNaN(page) ? 1 : page,
+      Number.isNaN(pageSize) ? 30 : pageSize
+    );
+    if (!data) {
+      return res.status(404).json({ code: 404, message: '用户不存在' });
+    }
+    res.json({ code: 200, message: 'success', data });
+  } catch (error) {
+    console.error('获取粉丝列表错误:', error);
+    res.status(500).json({ code: 500, message: '获取粉丝列表失败' });
   }
 };
 

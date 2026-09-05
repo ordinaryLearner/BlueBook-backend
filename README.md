@@ -123,8 +123,8 @@ Content-Type: application/json
       "avatar": null,
       "background": null,
       "bio": null,
-      "followers": [],
-      "fans": [],
+      "followers": 0,
+      "fans": 0,
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -178,8 +178,8 @@ Content-Type: application/json
       "avatar": null,
       "background": null,
       "bio": null,
-      "followers": [],
-      "fans": [],
+      "followers": 0,
+      "fans": 0,
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -235,8 +235,8 @@ Content-Type: application/json
       "avatar": null,
       "background": null,
       "bio": null,
-      "followers": [],
-      "fans": [],
+      "followers": 0,
+      "fans": 0,
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -290,8 +290,8 @@ Content-Type: application/json
     "avatar": null,
     "background": null,
     "bio": null,
-    "followers": [],
-    "fans": [],
+    "followers": 0,
+    "fans": 0,
     "totalLikes": 0,
     "join_time": "2024-01-01 00:00:00"
   }
@@ -1010,12 +1010,12 @@ GET /api/users/:id
 | `avatar` | string \| null | 头像图片 URL |
 | `background` | string \| null | 主页背景图 URL |
 | `bio` | string \| null | 个性签名 |
-| `followers` | User[] | 关注列表（该用户主动关注的用户对象数组） |
-| `fans` | User[] | 粉丝列表（关注该用户的用户对象数组） |
+| `followers` | number | 关注数（该用户主动关注的人数） |
+| `fans` | number | 粉丝数（关注该用户的人数） |
 | `totalLikes` | number | 该用户所有帖子收到的点赞总数（各帖 `likes` 数组长度之和，仅统计帖子） |
 | `join_time` | string | 注册时间 |
 
-每个 `followers` / `fans` 元素都是精简的 User 对象（`id` / `account` / `username` / `avatar` / `bio` / `join_time`）。
+> `followers` / `fans` 现在是对外只暴露的**数量**（Int），不是用户对象列表。
 
 **Response `200`：**
 
@@ -1030,17 +1030,8 @@ GET /api/users/:id
     "avatar": null,
     "background": null,
     "bio": null,
-    "followers": [
-      {
-        "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-        "account": "user456",
-        "username": "李四",
-        "avatar": null,
-        "bio": null,
-        "join_time": "2024-01-01 00:00:00"
-      }
-    ],
-    "fans": [],
+    "followers": 3,
+    "fans": 0,
     "totalLikes": 0,
     "join_time": "2024-01-01 00:00:00"
   }
@@ -1125,6 +1116,76 @@ Authorization: Bearer <token>
 
 ---
 
+### 11.4 获取关注列表
+
+```
+GET /api/users/:id/following?page=1&pageSize=30
+```
+
+无需登录。返回用户 `:id` 的**关注列表**（该用户主动关注的 User 对象），分页返回，`pageSize` 上限 **30**。
+
+**Query 参数：**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `page` | int | 1 | 页码，从 1 开始 |
+| `pageSize` | int | 30 | 每页条数，最大 30 |
+
+**Response `200`：** `data.users` 为 User 对象数组（每个都是精简 User：`id` / `account` / `username` / `avatar` / `bio` / `join_time`）。
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "total": 3,
+    "page": 1,
+    "pageSize": 30,
+    "hasMore": false,
+    "users": [
+      {
+        "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        "account": "user456",
+        "username": "李四",
+        "avatar": null,
+        "bio": null,
+        "join_time": "2024-01-01 00:00:00"
+      }
+    ]
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 404 | 404 | 用户不存在 |
+| 500 | 500 | 获取关注列表失败 |
+
+---
+
+### 11.5 获取粉丝列表
+
+```
+GET /api/users/:id/fans?page=1&pageSize=30
+```
+
+无需登录。返回用户 `:id` 的**粉丝列表**（关注该用户的 User 对象），分页返回，`pageSize` 上限 **30**。
+
+**Query 参数：** 同 11.4（`page` 默认 1，`pageSize` 默认 30，最大 30）。
+
+**Response `200`：** `data.users` 同样为精简 User 对象数组，结构同 11.4。
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 404 | 404 | 用户不存在 |
+| 500 | 500 | 获取粉丝列表失败 |
+
+---
+
 ### 12. 更新个人资料
 
 ```
@@ -1167,8 +1228,8 @@ Content-Type: application/json
       "avatar": "https://i.ibb.co/xxx/avatar.jpg",
       "background": "https://i.ibb.co/xxx/background.jpg",
       "bio": "热爱生活，热爱记录",
-      "followers": [],
-      "fans": [],
+      "followers": 0,
+      "fans": 0,
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },

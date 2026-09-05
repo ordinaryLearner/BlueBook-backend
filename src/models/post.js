@@ -12,23 +12,6 @@ const formatPost = (post) => {
   return post;
 };
 
-// 将 likes 中的用户 ID 列表展开为完整的用户信息对象列表（User 集合），顺序与传入一致
-const resolveLikes = async (ids) => {
-  if (!Array.isArray(ids) || ids.length === 0) return [];
-  const result = await pool.query(`
-    SELECT id, account, username, avatar, bio, join_time
-    FROM users
-    WHERE id = ANY($1::uuid[])
-  `, [ids]);
-  const byId = new Map(result.rows.map((u) => [u.id, u]));
-  return ids.map((id) => {
-    const u = byId.get(id);
-    if (!u) return null;
-    if (u.join_time) u.join_time = formatTime(u.join_time);
-    return u;
-  }).filter(Boolean);
-};
-
 const createPost = async (title, content, senderId, imageUrls) => {
   const postResult = await pool.query(
     'INSERT INTO posts (title, content, sender_id) VALUES ($1, $2, $3) RETURNING *',
@@ -90,39 +73,6 @@ const buildCommentTree = (rows) => {
   return roots.map(clean);
 };
 
-// 把每条评论的 likes(用户 ID 列表)批量展开为用户信息对象列表
-const attachLikesToComments = async (rows) => {
-  if (rows.length === 0) return rows;
-
-  const allIds = [];
-  for (const row of rows) {
-    if (Array.isArray(row.likes)) {
-      for (const id of row.likes) if (id && !allIds.includes(id)) allIds.push(id);
-    }
-  }
-
-  const byId = {};
-  if (allIds.length > 0) {
-    const result = await pool.query(`
-      SELECT id, account, username, avatar, bio, join_time
-      FROM users
-      WHERE id = ANY($1::uuid[])
-    `, [allIds]);
-    for (const u of result.rows) {
-      if (u.join_time) u.join_time = formatTime(u.join_time);
-      byId[u.id] = u;
-    }
-  }
-
-  for (const row of rows) {
-    row.likes = (Array.isArray(row.likes) ? row.likes : [])
-      .map((id) => byId[id] || null)
-      .filter(Boolean);
-  }
-
-  return rows;
-};
-
 const findCommentsByPostId = async (postId) => {
   const result = await pool.query(`
     SELECT c.*,
@@ -145,14 +95,13 @@ const findCommentsByPostId = async (postId) => {
     ORDER BY c.created_at ASC
   `, [postId]);
 
-  return buildCommentTree(await attachLikesToComments(result.rows));
+  return buildCommentTree(result.rows);
 };
 
 const attachCommentsToPosts = async (posts) => {
   for (const post of posts) {
     post.medias = await findMediasByPostId(post.id);
     post.comments = await findCommentsByPostId(post.id);
-    post.likes = await resolveLikes(post.likes);
     formatPost(post);
   }
   return posts;
@@ -198,7 +147,6 @@ const findPostById = async (id) => {
   const post = result.rows[0];
   post.medias = await findMediasByPostId(post.id);
   post.comments = await findCommentsByPostId(post.id);
-  post.likes = await resolveLikes(post.likes);
 
   return formatPost(post);
 };
@@ -358,7 +306,7 @@ const findFullCommentById = async (id) => {
 
   if (result.rows.length === 0) return null;
 
-  const row = (await attachLikesToComments([result.rows[0]]))[0];
+  const row = result.rows[0];
   return {
     id: row.id,
     content: row.content,

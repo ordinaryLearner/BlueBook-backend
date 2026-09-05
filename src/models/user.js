@@ -26,13 +26,13 @@ const computeTotalLikes = async (userId) => {
   return Number(result.rows[0]?.total) || 0;
 };
 
-// 统一的用户资料富化：把关注/粉丝改为主粒度数量（Int），并附上收到的点赞总数
+// 统一的用户资料富化：关注/粉丝返回原始用户 ID 列表，并附上收到的点赞总数
 const enrichProfile = async (row) => {
   const user = formatUser(row);
   if (!user) return null;
-  // followers/fans 列存的是 JSONB(用户ID数组)，对外只暴露数量
-  user.followers = Array.isArray(user.followers) ? user.followers.length : 0;
-  user.fans = Array.isArray(user.fans) ? user.fans.length : 0;
+  // followers/fans 列存的是 JSONB(用户ID数组)，对外原样返回 ID 列表
+  user.followers = Array.isArray(user.followers) ? user.followers : [];
+  user.fans = Array.isArray(user.fans) ? user.fans : [];
   user.totalLikes = await computeTotalLikes(user.id);
   return user;
 };

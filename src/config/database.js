@@ -112,6 +112,21 @@ const initDatabase = async () => {
       `);
     }
 
+    // 数据清理：历史版本曾把 likes/followers/fans 存成 JSON 计数（如数字 0），
+    // 导致并非数组的脏数据被原样回传。统一把所有非数组的 JSONB 修正为空数组，
+    // jsonb_typeof 已是 'array' 的正常行不受影响。
+    const cleanNonArrayColumns = async (table, column) => {
+      await pool.query(
+        `UPDATE ${table}
+         SET ${column} = '[]'::jsonb
+         WHERE jsonb_typeof(${column}) IS DISTINCT FROM 'array'`
+      );
+    };
+    await cleanNonArrayColumns('comments', 'likes');
+    await cleanNonArrayColumns('posts', 'likes');
+    await cleanNonArrayColumns('users', 'followers');
+    await cleanNonArrayColumns('users', 'fans');
+
     console.log('Database tables initialized successfully');
   } catch (error) {
     console.error('Database initialization failed:', error.message);

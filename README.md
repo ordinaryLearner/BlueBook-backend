@@ -431,8 +431,18 @@ GET /api/posts
           },
           "receiver": null,
           "likes": [
-            "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-            "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
+            {
+              "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+              "username": "李四",
+              "account": "user456",
+              "avatar": null
+            },
+            {
+              "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+              "username": "张三",
+              "account": "user123",
+              "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+            }
           ],
           "comments": [
             {
@@ -453,7 +463,12 @@ GET /api/posts
                 "avatar": null
               },
               "likes": [
-                "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
+                {
+                  "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                  "username": "李四",
+                  "account": "user456",
+                  "avatar": null
+                }
               ],
               "comments": []
             }
@@ -519,17 +534,27 @@ GET /api/posts/:id
           "account": "user456",
           "avatar": null
         },
-        "receiver": null,
-        "likes": [
-          "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-          "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
-        ],
-        "comments": [
-          {
-            "id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f7a",
-            "content": "谢谢～",
-            "time": "2024-01-01 01:00:00",
-            "type": "REPLYCOMMENT",
+          "receiver": null,
+          "likes": [
+            {
+              "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+              "username": "李四",
+              "account": "user456",
+              "avatar": null
+            },
+            {
+              "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+              "username": "张三",
+              "account": "user123",
+              "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+            }
+          ],
+          "comments": [
+            {
+              "id": "d4e5f6a7-b8c9-4d0e-8f1a-2b3c4d5e6f7a",
+              "content": "谢谢～",
+              "time": "2024-01-01 01:00:00",
+              "type": "REPLYCOMMENT",
             "sender": {
               "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
               "username": "张三",
@@ -543,7 +568,12 @@ GET /api/posts/:id
               "avatar": null
             },
             "likes": [
-              "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
+              {
+                "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                "username": "李四",
+                "account": "user456",
+                "avatar": null
+              }
             ],
             "comments": []
           }
@@ -567,7 +597,7 @@ GET /api/posts/:id
 | `type` | string | 评论类型：`POSTCOMMENT`（评论帖子）/ `REPLYCOMMENT`（回复评论） |
 | `sender` | object | 评论者信息（`id` / `username` / `account` / `avatar`） |
 | `receiver` | object | 被回复者信息（`id` / `username` / `account` / `avatar`）；`REPLYCOMMENT` 时返回，根评论为 `null` |
-| `likes` | array | 点赞该评论的用户 ID 列表（uuid 字符串数组，可为空） |
+| `likes` | array | 点赞该评论的用户列表（User 对象数组，元素含 `id` / `username` / `account` / `avatar`；可为空） |
 | `comments` | array | 该评论下的回复（嵌套评论树，可能为空数组） |
 
 **错误码：**
@@ -653,8 +683,18 @@ POST /api/posts/random
           },
           "receiver": null,
         "likes": [
-          "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-          "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
+          {
+            "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+            "username": "李四",
+            "account": "user456",
+            "avatar": null
+          },
+          {
+            "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+            "username": "张三",
+            "account": "user123",
+            "avatar": "https://i.ibb.co/xxx/avatar.jpg"
+          }
         ],
           "comments": []
         }
@@ -955,7 +995,7 @@ GET /api/users/:id
 | `totalLikes` | number | 该用户所有帖子收到的点赞总数（各帖 `likes` 数组长度之和，仅统计帖子） |
 | `join_time` | string | 注册时间 |
 
-> `followers` / `fans` 返回的是**用户 ID 列表**（关注数/粉丝数可通过 `list.length` 计算）。如需每个用户的精简资料，使用下方 `11.4` 关注列表 / `11.5` 粉丝列表的分页接口。所有返回 `likes` 的地方（帖子/评论/用户动态）均为用户 ID 列表。
+> `followers` / `fans` 返回的是**用户 ID 列表**（关注数/粉丝数可通过 `list.length` 计算）。如需每个用户的精简资料，使用下方 `11.4` 关注列表 / `11.5` 粉丝列表的分页接口。点赞字段说明：**帖子的 `likes`** 与 **用户资料的 `followers`/`fans`** 返回 uuid 字符串数组；**评论的 `likes`** 返回用户信息对象数组（`id` / `username` / `account` / `avatar`）。
 
 **Response `200`：**
 
@@ -1366,7 +1406,12 @@ Content-Type: application/json
     },
     "receiver": null,
     "likes": [
-      "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
+      {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123",
+        "avatar": null
+      }
     ],
     "comments": []
   }

@@ -73,6 +73,39 @@ const buildCommentTree = (rows) => {
   return roots.map(clean);
 };
 
+// 把每条评论的 likes(用户 ID 列表)批量展开为用户信息对象列表
+const attachLikesToComments = async (rows) => {
+  if (rows.length === 0) return rows;
+
+  const allIds = [];
+  for (const row of rows) {
+    if (Array.isArray(row.likes)) {
+      for (const id of row.likes) if (id && !allIds.includes(id)) allIds.push(id);
+    }
+  }
+
+  const byId = {};
+  if (allIds.length > 0) {
+    const result = await pool.query(`
+      SELECT id, account, username, avatar, bio, join_time
+      FROM users
+      WHERE id = ANY($1::uuid[])
+    `, [allIds]);
+    for (const u of result.rows) {
+      if (u.join_time) u.join_time = formatTime(u.join_time);
+      byId[u.id] = u;
+    }
+  }
+
+  for (const row of rows) {
+    row.likes = (Array.isArray(row.likes) ? row.likes : [])
+      .map((id) => byId[id] || null)
+      .filter(Boolean);
+  }
+
+  return rows;
+};
+
 const findCommentsByPostId = async (postId) => {
   const result = await pool.query(`
     SELECT c.*,
@@ -95,7 +128,8 @@ const findCommentsByPostId = async (postId) => {
     ORDER BY c.created_at ASC
   `, [postId]);
 
-  return buildCommentTree(result.rows);
+  const expanded = await attachLikesToComments(result.rows);
+  return buildCommentTree(expanded);
 };
 
 const attachCommentsToPosts = async (posts) => {
@@ -306,7 +340,7 @@ const findFullCommentById = async (id) => {
 
   if (result.rows.length === 0) return null;
 
-  const row = result.rows[0];
+  const row = (await attachLikesToComments([result.rows[0]]))[0];
   return {
     id: row.id,
     content: row.content,

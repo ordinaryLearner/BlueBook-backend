@@ -1079,7 +1079,7 @@ Authorization: Bearer <token>
 ### 11.2 取消关注
 
 ```
-DELETE /api/users/:id/follow
+DELETE /api/users/:id/unfollow
 Authorization: Bearer <token>
 ```
 

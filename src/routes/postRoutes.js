@@ -6,6 +6,10 @@ router.post('/', authenticate, postController.createPost);
 router.get('/', postController.getPosts);
 router.get('/my', authenticate, postController.getMyPosts);
 router.get('/myliked', authenticate, postController.getMyLikedPosts);
+router.get('/myfavorites', authenticate, postController.getMyFavorites);
+// 收藏/取消收藏指定帖子
+router.post('/:id/favorite', authenticate, postController.favorite);
+router.delete('/:id/favorite', authenticate, postController.unfavorite);
 router.get('/random', postController.getRandomPosts);
 router.post('/random', postController.getRandomPosts);
 router.get('/search', postController.searchPosts);

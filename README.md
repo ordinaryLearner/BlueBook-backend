@@ -125,6 +125,7 @@ Content-Type: application/json
       "bio": null,
       "followers": [],
       "fans": [],
+      "favorites": [],
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -180,6 +181,7 @@ Content-Type: application/json
       "bio": null,
       "followers": [],
       "fans": [],
+      "favorites": [],
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -237,6 +239,7 @@ Content-Type: application/json
       "bio": null,
       "followers": [],
       "fans": [],
+      "favorites": [],
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -292,6 +295,7 @@ Content-Type: application/json
     "bio": null,
     "followers": [],
     "fans": [],
+    "favorites": [],
     "totalLikes": 0,
     "join_time": "2024-01-01 00:00:00"
   }
@@ -972,6 +976,85 @@ Authorization: Bearer <token>
 
 ---
 
+### 10.2 收藏帖子
+
+```
+POST /api/posts/:postId/favorite
+Authorization: Bearer <token>
+```
+
+需要登录。把指定帖子添加到**当前登录用户**的收藏（`favorites`）列表，帖子身份取自路径参数 `:postId`，当前用户以 token 为准（`req.userId`）。结果为幂等：收藏已存在时不做重复追加。
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | 已收藏该帖子 |
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 404 | 404 | 帖子不存在 |
+| 500 | 500 | 收藏失败 |
+
+---
+
+### 10.3 取消收藏帖子
+
+```
+DELETE /api/posts/:postId/favorite
+Authorization: Bearer <token>
+```
+
+需要登录。把指定帖子从**当前登录用户**的收藏（`favorites`）列表中移除，参数与鉴权同上。
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | 未收藏该帖子 |
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 500 | 500 | 取消收藏失败 |
+
+---
+
+### 10.4 获取我收藏的帖子
+
+```
+GET /api/posts/myfavorites
+Authorization: Bearer <token>
+```
+
+需要登录，请求头携带 `Authorization: Bearer <token>`。返回当前登录用户**收藏过的所有帖子**（查询依据是 `users.favorites` 字段，即 JSONB 帖子 ID 列表），按收藏时 ID 顺序返回，结构与 `GET /api/posts/my` 完全相同（`data` 为完整帖子对象数组，可能为空数组）。**注意：此接口只能查询当前登录用户自己收藏过的帖子，不能传其他 `userId`**。若某收藏的帖子已被删除，该帖会自动从返回结果中跳过。
+
+**Response `200`：**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+      "title": "海边野餐攻略",
+      "content": "收藏这份海边野餐清单",
+      "sender": {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123"
+      },
+      "medias": [],
+      "likes": [],
+      "comments": [],
+      "time": "2024-01-01 00:00:00",
+      "created_at": "2024-01-01 00:00:00",
+      "updated_at": "2024-01-01 00:00:00"
+    }
+  ]
+}
+```
+
+说明：`token` 无效或缺失时返回 `401`。某个用户收藏了哪些帖子，也可通过该用户资料中的 `favorites`（`GET /api/users/:id`）拿到帖子 **ID 列表**，再逐条 `GET /api/posts/:id` 取详情，或用本接口一次取回当前用户收藏的所有完整帖子。
+
+---
+
 ### 11. 获取用户信息
 
 ```
@@ -992,10 +1075,11 @@ GET /api/users/:id
 | `bio` | string \| null | 个性签名 |
 | `followers` | array | 该用户主动关注的用户 ID 列表（uuid 字符串数组） |
 | `fans` | array | 关注该用户（粉丝）的用户 ID 列表（uuid 字符串数组） |
+| `favorites` | array | 该用户收藏的帖子 ID 列表（uuid 字符串数组） |
 | `totalLikes` | number | 该用户所有帖子收到的点赞总数（各帖 `likes` 数组长度之和，仅统计帖子） |
 | `join_time` | string | 注册时间 |
 
-> `followers` / `fans` 返回的是**用户 ID 列表**（关注数/粉丝数可通过 `list.length` 计算）。如需每个用户的精简资料，使用下方 `11.4` 关注列表 / `11.5` 粉丝列表的分页接口。点赞字段说明：**帖子的 `likes`** 与 **用户资料的 `followers`/`fans`** 返回 uuid 字符串数组；**评论的 `likes`** 返回用户信息对象数组（`id` / `username` / `account` / `avatar`）。
+> `followers` / `fans` 返回的是**用户 ID 列表**（关注数/粉丝数可通过 `list.length` 计算）。如需每个用户的精简资料，使用下方 `11.4` 关注列表 / `11.5` 粉丝列表的分页接口。点赞字段说明：**帖子的 `likes`** 与 **用户资料的 `followers`/`fans`/`favorites`** 返回 uuid 字符串数组；**评论的 `likes`** 返回用户信息对象数组（`id` / `username` / `account` / `avatar`）。
 
 **Response `200`：**
 
@@ -1012,6 +1096,7 @@ GET /api/users/:id
     "bio": null,
     "followers": ["5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"],
     "fans": [],
+    "favorites": [],
     "totalLikes": 0,
     "join_time": "2024-01-01 00:00:00"
   }
@@ -1210,6 +1295,7 @@ Content-Type: application/json
       "bio": "热爱生活，热爱记录",
       "followers": [],
       "fans": [],
+      "favorites": [],
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -1536,6 +1622,7 @@ CREATE TABLE users (
   bio        TEXT,
   followers  JSONB DEFAULT '[]'::jsonb,
   fans       JSONB DEFAULT '[]'::jsonb,
+  favorites  JSONB DEFAULT '[]'::jsonb,
   join_time  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -1570,3 +1657,5 @@ CREATE TABLE comments (
   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
+
+> **注：** `users.favorites` 列由服务启动时的 `initDatabase()` 通过幂等 `ALTER TABLE users ADD COLUMN IF NOT EXISTS favorites JSONB DEFAULT '[]'::jsonb` 自动补齐（无需手动建表），并会像 `followers`/`fans`/`likes` 一样，把历史遗留的**非数组**脏数据统一纠正为空数组 `[]`。上面给出的 DDL 为包含该列后的最终结构。

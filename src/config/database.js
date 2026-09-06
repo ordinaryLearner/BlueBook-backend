@@ -50,6 +50,12 @@ const initDatabase = async () => {
       ADD COLUMN IF NOT EXISTS fans JSONB DEFAULT '[]'::jsonb
     `);
 
+    // 兼容已存在的表：幂等补充收藏列，用于存储该用户收藏的帖子 ID 列表
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS favorites JSONB DEFAULT '[]'::jsonb
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS posts (
         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -126,6 +132,7 @@ const initDatabase = async () => {
     await cleanNonArrayColumns('posts', 'likes');
     await cleanNonArrayColumns('users', 'followers');
     await cleanNonArrayColumns('users', 'fans');
+    await cleanNonArrayColumns('users', 'favorites');
 
     console.log('Database tables initialized successfully');
   } catch (error) {

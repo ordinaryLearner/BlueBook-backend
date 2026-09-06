@@ -226,6 +226,79 @@ const findLikedPostsByUserId = async (userId) => {
   return attachCommentsToPosts(result.rows);
 };
 
+// 查询某用户收藏的所有帖子：先读 users.favorites(JSONB 帖子ID数组)，再按该数组批量取回帖子
+const findFavoritePostsByUserId = async (userId) => {
+  const favRes = await pool.query(
+    'SELECT favorites FROM users WHERE id = $1',
+    [userId]
+  );
+  const row = favRes.rows[0];
+  if (!row) return [];
+  const ids = Array.isArray(row.favorites) ? row.favorites : [];
+  if (ids.length === 0) return [];
+
+  const result = await pool.query(`
+    SELECT p.*,
+      json_build_object(
+        'id', u.id,
+        'username', u.username,
+        'account', u.account,
+        'avatar', u.avatar,
+        'bio', u.bio,
+        'join_time', u.join_time
+      ) as sender
+    FROM posts p
+    JOIN users u ON p.sender_id = u.id
+    WHERE p.id = ANY($1::uuid[])
+  `, [ids]);
+
+  // 按收藏顺序返回，收藏后帖子被删除的可跳过
+  const byId = new Map(result.rows.map((post) => [post.id, post]));
+  const ordered = ids
+    .map((id) => byId.get(id))
+    .filter(Boolean);
+
+  return attachCommentsToPosts(ordered);
+};
+
+// 收藏帖子：把 postId 加入 users.favorites(JSONB 帖子ID列表)，已存在则保持不变
+const addFavorite = async (userId, postId) => {
+  const result = await pool.query(`
+    UPDATE users
+    SET favorites = CASE WHEN favorites @> $2::jsonb THEN favorites ELSE favorites || $2::jsonb END,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1
+    RETURNING favorites
+  `, [userId, JSON.stringify([postId])]);
+  return result.rows[0] || null;
+};
+
+// 取消收藏：把 postId 从 users.favorites(JSONB 帖子ID列表)中移除
+const removeFavorite = async (userId, postId) => {
+  const result = await pool.query(`
+    UPDATE users
+    SET favorites = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+                     FROM jsonb_array_elements(favorites) elem
+                     WHERE elem::text <> $2),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1
+    RETURNING favorites
+  `, [userId, JSON.stringify(postId)]);
+  return result.rows[0] || null;
+};
+
+// 判断某用户是否已收藏某帖子
+const isFavorited = async (userId, postId) => {
+  const result = await pool.query(
+    'SELECT favorites FROM users WHERE id = $1',
+    [userId]
+  );
+  const favorites = result.rows[0]?.favorites || [];
+  return Array.isArray(favorites)
+    ? favorites.some((id) => id === postId)
+    : false;
+};
+
 // 模糊搜索标题和内容，排除客户端已上传的(已加载)帖子后，按创建时间倒序取一页匹配的帖子
 const searchPosts = async (keyword, limit = 10, excludeIds = []) => {
   const ids = Array.isArray(excludeIds) ? excludeIds.filter(Boolean) : [];
@@ -359,6 +432,10 @@ module.exports = {
   findPostById,
   findPostsByUserId,
   findLikedPostsByUserId,
+  findFavoritePostsByUserId,
+  addFavorite,
+  removeFavorite,
+  isFavorited,
   findRandomRecentPosts,
   searchPosts,
   createComment,

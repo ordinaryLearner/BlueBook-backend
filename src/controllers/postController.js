@@ -1,4 +1,4 @@
-const { createPost, findAllPosts, findPostById, findPostsByUserId, findLikedPostsByUserId, findRandomRecentPosts, searchPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
+const { createPost, findAllPosts, findPostById, findPostsByUserId, findLikedPostsByUserId, addFavorite, removeFavorite, isFavorited, findFavoritePostsByUserId, findRandomRecentPosts, searchPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
 const { findById } = require('../models/user');
 
 exports.createPost = async (req, res) => {
@@ -86,6 +86,62 @@ exports.getMyLikedPosts = async (req, res) => {
   } catch (error) {
     console.error('获取我点赞的帖子错误:', error);
     res.status(500).json({ code: 500, message: '获取我点赞的帖子失败' });
+  }
+};
+
+// ==================== 收藏帖子 ====================
+exports.favorite = async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.userId;
+
+    const post = await findPostById(postId);
+    if (!post) {
+      return res.status(404).json({ code: 404, message: '帖子不存在' });
+    }
+
+    if (await isFavorited(userId, postId)) {
+      return res.status(400).json({ code: 400, message: '已收藏该帖子' });
+    }
+
+    await addFavorite(userId, postId);
+    res.json({ code: 200, message: '收藏成功' });
+  } catch (error) {
+    console.error('收藏帖子错误:', error);
+    res.status(500).json({ code: 500, message: '收藏失败' });
+  }
+};
+
+// ==================== 取消收藏帖子 ====================
+exports.unfavorite = async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.userId;
+
+    if (!(await isFavorited(userId, postId))) {
+      return res.status(400).json({ code: 400, message: '未收藏该帖子' });
+    }
+
+    await removeFavorite(userId, postId);
+    res.json({ code: 200, message: '取消收藏成功' });
+  } catch (error) {
+    console.error('取消收藏帖子错误:', error);
+    res.status(500).json({ code: 500, message: '取消收藏失败' });
+  }
+};
+
+// ==================== 我收藏的帖子列表 ====================
+exports.getMyFavorites = async (req, res) => {
+  try {
+    const posts = await findFavoritePostsByUserId(req.userId);
+    res.json({
+      code: 200,
+      message: 'success',
+      data: posts
+    });
+  } catch (error) {
+    console.error('获取我收藏的帖子错误:', error);
+    res.status(500).json({ code: 500, message: '获取我收藏的帖子失败' });
   }
 };
 

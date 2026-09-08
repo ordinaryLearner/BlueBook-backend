@@ -226,17 +226,9 @@ const findLikedPostsByUserId = async (userId) => {
   return attachCommentsToPosts(result.rows);
 };
 
-// 查询某用户收藏的所有帖子：先读 users.favorites(JSONB 帖子ID数组)，再按该数组批量取回帖子
+// 查询某用户收藏过的所有帖子：收藏关系统一由 posts.favourite(JSONB 用户ID数组)承载，
+// 反向找出所有 favourite 中包含该用户 ID 的帖子，按创建时间倒序返回
 const findFavoritePostsByUserId = async (userId) => {
-  const favRes = await pool.query(
-    'SELECT favorites FROM users WHERE id = $1',
-    [userId]
-  );
-  const row = favRes.rows[0];
-  if (!row) return [];
-  const ids = Array.isArray(row.favorites) ? row.favorites : [];
-  if (ids.length === 0) return [];
-
   const result = await pool.query(`
     SELECT p.*,
       json_build_object(
@@ -249,98 +241,49 @@ const findFavoritePostsByUserId = async (userId) => {
       ) as sender
     FROM posts p
     JOIN users u ON p.sender_id = u.id
-    WHERE p.id = ANY($1::uuid[])
-  `, [ids]);
+    WHERE p.favourite @> $1::jsonb
+    ORDER BY p.created_at DESC
+  `, [JSON.stringify([userId])]);
 
-  // 按收藏顺序返回，收藏后帖子被删除的可跳过
-  const byId = new Map(result.rows.map((post) => [post.id, post]));
-  const ordered = ids
-    .map((id) => byId.get(id))
-    .filter(Boolean);
-
-  return attachCommentsToPosts(ordered);
+  return attachCommentsToPosts(result.rows);
 };
 
-// 收藏帖子：postId 加入 users.favorites，同时把 userId 镜像写入该帖子的 favourite，任一侧失败则整体回滚
+// 收藏帖子：把 userId 幂等加入该帖子的 favourite(JSONB 用户ID列表)，收藏关系只存于帖子侧
 const addFavorite = async (userId, postId) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const result = await client.query(`
-      UPDATE users
-      SET favorites = CASE WHEN favorites @> $2::jsonb THEN favorites ELSE favorites || $2::jsonb END,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1
-      RETURNING favorites
-    `, [userId, JSON.stringify([postId])]);
-    const favoritesRow = result.rows[0] || null;
-
-    if (favoritesRow) {
-      await client.query(`
-        UPDATE posts
-        SET favourite = CASE WHEN favourite @> $2::jsonb THEN favourite ELSE favourite || $2::jsonb END,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-      `, [postId, JSON.stringify([userId])]);
-    }
-
-    await client.query('COMMIT');
-    return favoritesRow;
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  const result = await pool.query(`
+    UPDATE posts
+    SET favourite = CASE WHEN favourite @> $2::jsonb THEN favourite ELSE favourite || $2::jsonb END,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1
+    RETURNING *
+  `, [postId, JSON.stringify([userId])]);
+  return result.rows[0] || null;
 };
 
-// 取消收藏：把 postId 从 users.favorites 移除，同时把 userId 从该帖子的 favourite 中镜像移除
+// 取消收藏：把 userId 从该帖子的 favourite 中幂等移除
 const removeFavorite = async (userId, postId) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const result = await client.query(`
-      UPDATE users
-      SET favorites = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
-                       FROM jsonb_array_elements(favorites) elem
-                       WHERE elem::text <> $2),
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1
-      RETURNING favorites
-    `, [userId, JSON.stringify(postId)]);
-    const favoritesRow = result.rows[0] || null;
-
-    if (favoritesRow) {
-      await client.query(`
-        UPDATE posts
-        SET favourite = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
-                         FROM jsonb_array_elements(favourite) elem
-                         WHERE elem::text <> $2),
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-      `, [postId, JSON.stringify(userId)]);
-    }
-
-    await client.query('COMMIT');
-    return favoritesRow;
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  const result = await pool.query(`
+    UPDATE posts
+    SET favourite = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+                     FROM jsonb_array_elements(favourite) elem
+                     WHERE elem::text <> $2),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1
+    RETURNING *
+  `, [postId, JSON.stringify(userId)]);
+  return result.rows[0] || null;
 };
 
-// 判断某用户是否已收藏某帖子
+// 判断某用户是否已收藏某帖子（查帖子的 favourite 是否包含该用户 ID）
 const isFavorited = async (userId, postId) => {
   const result = await pool.query(
-    'SELECT favorites FROM users WHERE id = $1',
-    [userId]
+    'SELECT favourite FROM posts WHERE id = $1',
+    [postId]
   );
-  const favorites = result.rows[0]?.favorites || [];
-  return Array.isArray(favorites)
-    ? favorites.some((id) => id === postId)
-    : false;
+  const row = result.rows[0];
+  if (!row) return false;
+  const favourite = Array.isArray(row.favourite) ? row.favourite : [];
+  return favourite.some((id) => id === userId);
 };
 
 // 模糊搜索标题和内容，排除客户端已上传的(已加载)帖子后，按创建时间倒序取一页匹配的帖子

@@ -50,12 +50,6 @@ const initDatabase = async () => {
       ADD COLUMN IF NOT EXISTS fans JSONB DEFAULT '[]'::jsonb
     `);
 
-    // 兼容已存在的表：幂等补充收藏列，用于存储该用户收藏的帖子 ID 列表
-    await pool.query(`
-      ALTER TABLE users
-      ADD COLUMN IF NOT EXISTS favorites JSONB DEFAULT '[]'::jsonb
-    `);
-
     await pool.query(`
       CREATE TABLE IF NOT EXISTS posts (
         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -68,11 +62,39 @@ const initDatabase = async () => {
       )
     `);
 
-    // 兼容已存在的表：幂等补充收藏列，用于存储收藏过该帖子的用户 ID 列表（与 users.favorites 双向同步）
+    // 兼容已存在的表：幂等补充收藏列，用于存储收藏过该帖子的用户 ID 列表
     await pool.query(`
       ALTER TABLE posts
       ADD COLUMN IF NOT EXISTS favourite JSONB DEFAULT '[]'::jsonb
     `);
+
+    // 收藏关系收敛到帖子侧：若历史版本的 users.favorites（用户收藏的帖子 ID 数组）仍存在，
+    // 先据此把每个收藏用户的 ID 回填到对应帖子的 favourite，再删除 users.favorites 列。
+    // 仅在列确实存在时执行一次，保证旧收藏数据不丢失，之后不再维护该列。
+    const userFavCol = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'users' AND column_name = 'favorites' LIMIT 1
+    `);
+    if (userFavCol.rows.length > 0) {
+      await pool.query(`
+        WITH fav AS (
+          SELECT u.id AS user_id, elem AS post_id
+          FROM users u,
+               LATERAL jsonb_array_elements_text(COALESCE(u.favorites, '[]'::jsonb)) elem
+          WHERE jsonb_typeof(u.favorites) = 'array'
+            AND elem ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        )
+        UPDATE posts p
+        SET favourite = COALESCE(
+          (SELECT JSONB_AGG(DISTINCT f.user_id)
+           FROM fav f
+           WHERE f.post_id = p.id::text),
+          '[]'::jsonb
+        )
+        WHERE p.id::text IN (SELECT post_id FROM fav)
+      `);
+      await pool.query('ALTER TABLE users DROP COLUMN IF EXISTS favorites');
+    }
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS post_medias (
@@ -138,7 +160,6 @@ const initDatabase = async () => {
     await cleanNonArrayColumns('posts', 'likes');
     await cleanNonArrayColumns('users', 'followers');
     await cleanNonArrayColumns('users', 'fans');
-    await cleanNonArrayColumns('users', 'favorites');
     await cleanNonArrayColumns('posts', 'favourite');
 
     console.log('Database tables initialized successfully');

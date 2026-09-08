@@ -5,7 +5,7 @@ const { formatTime } = require('../utils/time');
 // 对外暴露的用户非敏感字段（密码一律不返回）
 const PUBLIC_COLUMNS = `
   id, account, username, avatar, background, bio,
-  followers, fans, favorites, join_time
+  followers, fans, join_time
 `;
 
 const formatUser = (row) => {
@@ -33,8 +33,6 @@ const enrichProfile = async (row) => {
   // followers/fans 列存的是 JSONB(用户ID数组)，对外原样返回 ID 列表
   user.followers = Array.isArray(user.followers) ? user.followers : [];
   user.fans = Array.isArray(user.fans) ? user.fans : [];
-  // favorites 列存的是 JSONB(帖子ID数组)，同样对外返回 ID 列表
-  user.favorites = Array.isArray(user.favorites) ? user.favorites : [];
   user.totalLikes = await computeTotalLikes(user.id);
   return user;
 };

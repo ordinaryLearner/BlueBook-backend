@@ -125,7 +125,6 @@ Content-Type: application/json
       "bio": null,
       "followers": [],
       "fans": [],
-      "favorites": [],
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -181,7 +180,6 @@ Content-Type: application/json
       "bio": null,
       "followers": [],
       "fans": [],
-      "favorites": [],
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -239,7 +237,6 @@ Content-Type: application/json
       "bio": null,
       "followers": [],
       "fans": [],
-      "favorites": [],
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -295,7 +292,6 @@ Content-Type: application/json
     "bio": null,
     "followers": [],
     "fans": [],
-    "favorites": [],
     "totalLikes": 0,
     "join_time": "2024-01-01 00:00:00"
   }
@@ -992,7 +988,7 @@ POST /api/posts/:postId/favorite
 Authorization: Bearer <token>
 ```
 
-需要登录。把指定帖子添加到**当前登录用户**的收藏（`favorites`）列表，帖子身份取自路径参数 `:postId`，当前用户以 token 为准（`req.userId`）。结果为幂等：收藏已存在时不做重复追加。收藏时会**双向同步**：除更新 `users.favorites` 外，还会把当前用户 ID 镜像追加到该帖子的 `favourite`（JSONB 用户 ID 列表）中，两块数据在同一事务内保持一致。
+需要登录。把**当前登录用户**（以 token 的 `req.userId` 为准）标记为已收藏路径参数 `:postId` 指向的帖子。幂等：该用户已收藏时不做重复添加（收藏关系只记录在该帖子的 `favourite`（JSONB 用户 ID 列表）上）。
 
 **错误码：**
 
@@ -1012,7 +1008,7 @@ DELETE /api/posts/:postId/favorite
 Authorization: Bearer <token>
 ```
 
-需要登录。把指定帖子从**当前登录用户**的收藏（`favorites`）列表中移除，参数与鉴权同上。取消收藏同样**双向同步**，会把当前用户 ID 从该帖子的 `favourite` 列表中一并移除。
+需要登录。把**当前登录用户**从该帖子的收藏中移除（即从该帖子的 `favourite` 用户 ID 列表里去掉该用户 ID），参数与鉴权同上。
 
 **错误码：**
 
@@ -1031,7 +1027,7 @@ GET /api/posts/myfavorites
 Authorization: Bearer <token>
 ```
 
-需要登录，请求头携带 `Authorization: Bearer <token>`。返回当前登录用户**收藏过的所有帖子**（查询依据是 `users.favorites` 字段，即 JSONB 帖子 ID 列表），按收藏时 ID 顺序返回，结构与 `GET /api/posts/my` 完全相同（`data` 为完整帖子对象数组，可能为空数组）。**注意：此接口只能查询当前登录用户自己收藏过的帖子，不能传其他 `userId`**。若某收藏的帖子已被删除，该帖会自动从返回结果中跳过。
+需要登录，请求头携带 `Authorization: Bearer <token>`。返回**当前登录用户收藏过的所有帖子**（查询依据是帖子自身的 `favourite` 字段，即 JSONB 用户 ID 列表里是否包含当前用户 ID），按创建时间倒序返回，结构与 `GET /api/posts/my` 完全相同（`data` 为完整帖子对象数组，可能为空数组）。**注意：此接口只能查询当前登录用户自己收藏过的帖子，不能传其他 `userId`**。
 
 **Response `200`：**
 
@@ -1061,7 +1057,7 @@ Authorization: Bearer <token>
 }
 ```
 
-说明：`token` 无效或缺失时返回 `401`。某个用户收藏了哪些帖子，也可通过该用户资料中的 `favorites`（`GET /api/users/:id`）拿到帖子 **ID 列表**，再逐条 `GET /api/posts/:id` 取详情，或用本接口一次取回当前用户收藏的所有完整帖子。
+说明：`token` 无效或缺失时返回 `401`。收藏关系只记录在帖子自身的 `favourite` 字段上，用户资料中不再包含收藏列表。
 
 ---
 
@@ -1085,11 +1081,10 @@ GET /api/users/:id
 | `bio` | string \| null | 个性签名 |
 | `followers` | array | 该用户主动关注的用户 ID 列表（uuid 字符串数组） |
 | `fans` | array | 关注该用户（粉丝）的用户 ID 列表（uuid 字符串数组） |
-| `favorites` | array | 该用户收藏的帖子 ID 列表（uuid 字符串数组） |
 | `totalLikes` | number | 该用户所有帖子收到的点赞总数（各帖 `likes` 数组长度之和，仅统计帖子） |
 | `join_time` | string | 注册时间 |
 
-> `followers` / `fans` 返回的是**用户 ID 列表**（关注数/粉丝数可通过 `list.length` 计算）。如需每个用户的精简资料，使用下方 `11.4` 关注列表 / `11.5` 粉丝列表的分页接口。点赞字段说明：**帖子的 `likes`、`favourite`** 与 **用户资料的 `followers`/`fans`/`favorites`** 返回 uuid 字符串数组（帖子的 `favourite` 为收藏该帖的用户 ID 列表）；**评论的 `likes`** 返回用户信息对象数组（`id` / `username` / `account` / `avatar`）。
+> `followers` / `fans` 返回的是**用户 ID 列表**（关注数/粉丝数可通过 `list.length` 计算）。如需每个用户的精简资料，使用下方 `11.4` 关注列表 / `11.5` 粉丝列表的分页接口。点赞字段说明：**帖子的 `likes`、`favourite`** 与 **用户资料的 `followers`/`fans`** 返回 uuid 字符串数组（帖子的 `favourite` 为收藏该帖的用户 ID 列表）；**评论的 `likes`** 返回用户信息对象数组（`id` / `username` / `account` / `avatar`）。
 
 **Response `200`：**
 
@@ -1106,7 +1101,6 @@ GET /api/users/:id
     "bio": null,
     "followers": ["5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"],
     "fans": [],
-    "favorites": [],
     "totalLikes": 0,
     "join_time": "2024-01-01 00:00:00"
   }
@@ -1305,7 +1299,6 @@ Content-Type: application/json
       "bio": "热爱生活，热爱记录",
       "followers": [],
       "fans": [],
-      "favorites": [],
       "totalLikes": 0,
       "join_time": "2024-01-01 00:00:00"
     },
@@ -1634,7 +1627,6 @@ CREATE TABLE users (
   bio        TEXT,
   followers  JSONB DEFAULT '[]'::jsonb,
   fans       JSONB DEFAULT '[]'::jsonb,
-  favorites  JSONB DEFAULT '[]'::jsonb,
   join_time  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -1671,4 +1663,4 @@ CREATE TABLE comments (
 );
 ```
 
-> **注：** `users.favorites` 列由服务启动时的 `initDatabase()` 通过幂等 `ALTER TABLE users ADD COLUMN IF NOT EXISTS favorites JSONB DEFAULT '[]'::jsonb` 自动补齐（无需手动建表），并会像 `followers`/`fans`/`likes` 一样，把历史遗留的**非数组**脏数据统一纠正为空数组 `[]`。`posts.favourite` 同理，由 `initDatabase()` 通过幂等 `ALTER TABLE posts ADD COLUMN IF NOT EXISTS favourite JSONB DEFAULT '[]'::jsonb` 自动补齐，存储收藏过该帖子的用户 ID 列表。上面给出的 DDL 为包含这些列后的最终结构。
+> **注：** 收藏关系只记录在帖子侧。`posts.favourite`（收藏该帖的用户 ID 列表）列由服务启动时的 `initDatabase()` 通过幂等 `ALTER TABLE posts ADD COLUMN IF NOT EXISTS favourite JSONB DEFAULT '[]'::jsonb` 自动补齐，并像 `followers`/`fans`/`likes` 一样把历史遗留的**非数组**脏数据统一纠正为空数组 `[]`。历史版本的 `users.favorites` 列（用户收藏的帖子 ID 数组）已在 `initDatabase()` 中做一次性回填：把旧收藏数据镜像写入对应帖子的 `favourite` 后删除该列，用户资料不再含任何收藏字段。上面给出的 DDL 为最终结构。

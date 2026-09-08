@@ -366,6 +366,7 @@ Content-Type: application/json
       }
     ],
     "likes": [],
+    "favourite": [],
     "comments": [],
     "time": "2024-01-01 00:00:00",
     "created_at": "2024-01-01 00:00:00",
@@ -421,6 +422,7 @@ GET /api/posts
       "likes": [
         "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
       ],
+      "favourite": [],
       "comments": [
         {
           "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
@@ -526,6 +528,7 @@ GET /api/posts/:id
     "likes": [
       "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
     ],
+    "favourite": [],
     "comments": [
       {
         "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
@@ -673,6 +676,7 @@ POST /api/posts/random
       "likes": [
         "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
       ],
+      "favourite": [],
       "comments": [
         {
           "id": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
@@ -722,6 +726,7 @@ POST /api/posts/random
       },
       "medias": [],
       "likes": [],
+      "favourite": [],
       "comments": [],
       "time": "2024-01-02 00:00:00",
       "created_at": "2024-01-02 00:00:00",
@@ -747,7 +752,7 @@ POST /api/posts/random
 - 请求体 `excludeIds`（数组，`POST` 或 GET 的 `query` 参数）用于排除客户端**已获取**的帖子 ID；匹配到这些 ID 的帖子不会被返回
 - Android 端 Retrofit 请用 `POST /api/posts/random` 并在请求体中上传 `excludeIds`
 - 每条帖子的结构完全相同，Android 端可解析为 `List<Post>`
-- `sender` 为完整的用户信息对象；`medias` 为图片列表（可为空数组）；`likes` 为点赞该帖的用户 ID 列表（uuid 字符串数组，可为空）；`comments` 为评论列表（可为空数组）
+- `sender` 为完整的用户信息对象；`medias` 为图片列表（可为空数组）；`likes` 为点赞该帖的用户 ID 列表；`favourite` 为收藏该帖的用户 ID 列表（两者均为 uuid 字符串数组，可为空）；`comments` 为评论列表（可为空数组）
 
 ---
 
@@ -810,7 +815,7 @@ GET /api/posts/search?keyword=海边&pageSize=10
 # 排除指定 id：?keyword=海边&excludePosts=5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f
 ```
 
-**Response `200`：** `data` 为排除 `excludePosts` 后匹配到的完整帖子对象数组（结构与 `GET /api/posts` 的元素一致，含 `sender` / `medias` / `likes` / `comments`），例如：
+**Response `200`：** `data` 为排除 `excludePosts` 后匹配到的完整帖子对象数组（结构与 `GET /api/posts` 的元素一致，含 `sender` / `medias` / `likes` / `favourite` / `comments`），例如：
 
 ```json
 {
@@ -832,6 +837,7 @@ GET /api/posts/search?keyword=海边&pageSize=10
       },
       "medias": [],
       "likes": [],
+      "favourite": [],
       "comments": [],
       "time": "2024-01-01 00:00:00",
       "created_at": "2024-01-01 00:00:00",
@@ -852,6 +858,7 @@ GET /api/posts/search?keyword=海边&pageSize=10
       },
       "medias": [],
       "likes": [],
+      "favourite": [],
       "comments": [],
       "time": "2024-01-02 00:00:00",
       "created_at": "2024-01-02 00:00:00",
@@ -917,6 +924,7 @@ GET /api/posts/my
       },
       "medias": [],
       "likes": [],
+      "favourite": [],
       "comments": [],
       "time": "2024-01-01 00:00:00",
       "created_at": "2024-01-01 00:00:00",
@@ -963,6 +971,7 @@ Authorization: Bearer <token>
       "likes": [
         "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
       ],
+      "favourite": [],
       "comments": [],
       "time": "2024-01-01 00:00:00",
       "created_at": "2024-01-01 00:00:00",
@@ -983,7 +992,7 @@ POST /api/posts/:postId/favorite
 Authorization: Bearer <token>
 ```
 
-需要登录。把指定帖子添加到**当前登录用户**的收藏（`favorites`）列表，帖子身份取自路径参数 `:postId`，当前用户以 token 为准（`req.userId`）。结果为幂等：收藏已存在时不做重复追加。
+需要登录。把指定帖子添加到**当前登录用户**的收藏（`favorites`）列表，帖子身份取自路径参数 `:postId`，当前用户以 token 为准（`req.userId`）。结果为幂等：收藏已存在时不做重复追加。收藏时会**双向同步**：除更新 `users.favorites` 外，还会把当前用户 ID 镜像追加到该帖子的 `favourite`（JSONB 用户 ID 列表）中，两块数据在同一事务内保持一致。
 
 **错误码：**
 
@@ -1003,7 +1012,7 @@ DELETE /api/posts/:postId/favorite
 Authorization: Bearer <token>
 ```
 
-需要登录。把指定帖子从**当前登录用户**的收藏（`favorites`）列表中移除，参数与鉴权同上。
+需要登录。把指定帖子从**当前登录用户**的收藏（`favorites`）列表中移除，参数与鉴权同上。取消收藏同样**双向同步**，会把当前用户 ID 从该帖子的 `favourite` 列表中一并移除。
 
 **错误码：**
 
@@ -1042,6 +1051,7 @@ Authorization: Bearer <token>
       },
       "medias": [],
       "likes": [],
+      "favourite": [],
       "comments": [],
       "time": "2024-01-01 00:00:00",
       "created_at": "2024-01-01 00:00:00",
@@ -1079,7 +1089,7 @@ GET /api/users/:id
 | `totalLikes` | number | 该用户所有帖子收到的点赞总数（各帖 `likes` 数组长度之和，仅统计帖子） |
 | `join_time` | string | 注册时间 |
 
-> `followers` / `fans` 返回的是**用户 ID 列表**（关注数/粉丝数可通过 `list.length` 计算）。如需每个用户的精简资料，使用下方 `11.4` 关注列表 / `11.5` 粉丝列表的分页接口。点赞字段说明：**帖子的 `likes`** 与 **用户资料的 `followers`/`fans`/`favorites`** 返回 uuid 字符串数组；**评论的 `likes`** 返回用户信息对象数组（`id` / `username` / `account` / `avatar`）。
+> `followers` / `fans` 返回的是**用户 ID 列表**（关注数/粉丝数可通过 `list.length` 计算）。如需每个用户的精简资料，使用下方 `11.4` 关注列表 / `11.5` 粉丝列表的分页接口。点赞字段说明：**帖子的 `likes`、`favourite`** 与 **用户资料的 `followers`/`fans`/`favorites`** 返回 uuid 字符串数组（帖子的 `favourite` 为收藏该帖的用户 ID 列表）；**评论的 `likes`** 返回用户信息对象数组（`id` / `username` / `account` / `avatar`）。
 
 **Response `200`：**
 
@@ -1465,6 +1475,7 @@ Content-Type: application/json
     "likes": [
       "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
     ],
+    "favourite": [],
     "comments": [],
     "time": "2024-01-01 00:00:00",
     "created_at": "2024-01-01 00:00:00",
@@ -1569,6 +1580,7 @@ Content-Type: application/json
     },
     "medias": [],
     "likes": [],
+    "favourite": [],
     "comments": [],
     "time": "2024-01-01 00:00:00",
     "created_at": "2024-01-01 00:00:00",
@@ -1634,6 +1646,7 @@ CREATE TABLE posts (
   content    TEXT NOT NULL DEFAULT '',
   sender_id  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   likes      JSONB DEFAULT '[]'::jsonb,
+  favourite  JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -1658,4 +1671,4 @@ CREATE TABLE comments (
 );
 ```
 
-> **注：** `users.favorites` 列由服务启动时的 `initDatabase()` 通过幂等 `ALTER TABLE users ADD COLUMN IF NOT EXISTS favorites JSONB DEFAULT '[]'::jsonb` 自动补齐（无需手动建表），并会像 `followers`/`fans`/`likes` 一样，把历史遗留的**非数组**脏数据统一纠正为空数组 `[]`。上面给出的 DDL 为包含该列后的最终结构。
+> **注：** `users.favorites` 列由服务启动时的 `initDatabase()` 通过幂等 `ALTER TABLE users ADD COLUMN IF NOT EXISTS favorites JSONB DEFAULT '[]'::jsonb` 自动补齐（无需手动建表），并会像 `followers`/`fans`/`likes` 一样，把历史遗留的**非数组**脏数据统一纠正为空数组 `[]`。`posts.favourite` 同理，由 `initDatabase()` 通过幂等 `ALTER TABLE posts ADD COLUMN IF NOT EXISTS favourite JSONB DEFAULT '[]'::jsonb` 自动补齐，存储收藏过该帖子的用户 ID 列表。上面给出的 DDL 为包含这些列后的最终结构。

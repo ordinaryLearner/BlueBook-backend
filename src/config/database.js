@@ -68,6 +68,12 @@ const initDatabase = async () => {
       )
     `);
 
+    // 兼容已存在的表：幂等补充收藏列，用于存储收藏过该帖子的用户 ID 列表（与 users.favorites 双向同步）
+    await pool.query(`
+      ALTER TABLE posts
+      ADD COLUMN IF NOT EXISTS favourite JSONB DEFAULT '[]'::jsonb
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS post_medias (
         id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -133,6 +139,7 @@ const initDatabase = async () => {
     await cleanNonArrayColumns('users', 'followers');
     await cleanNonArrayColumns('users', 'fans');
     await cleanNonArrayColumns('users', 'favorites');
+    await cleanNonArrayColumns('posts', 'favourite');
 
     console.log('Database tables initialized successfully');
   } catch (error) {

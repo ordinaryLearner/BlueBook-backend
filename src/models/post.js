@@ -261,30 +261,74 @@ const findFavoritePostsByUserId = async (userId) => {
   return attachCommentsToPosts(ordered);
 };
 
-// 收藏帖子：把 postId 加入 users.favorites(JSONB 帖子ID列表)，已存在则保持不变
+// 收藏帖子：postId 加入 users.favorites，同时把 userId 镜像写入该帖子的 favourite，任一侧失败则整体回滚
 const addFavorite = async (userId, postId) => {
-  const result = await pool.query(`
-    UPDATE users
-    SET favorites = CASE WHEN favorites @> $2::jsonb THEN favorites ELSE favorites || $2::jsonb END,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = $1
-    RETURNING favorites
-  `, [userId, JSON.stringify([postId])]);
-  return result.rows[0] || null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(`
+      UPDATE users
+      SET favorites = CASE WHEN favorites @> $2::jsonb THEN favorites ELSE favorites || $2::jsonb END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING favorites
+    `, [userId, JSON.stringify([postId])]);
+    const favoritesRow = result.rows[0] || null;
+
+    if (favoritesRow) {
+      await client.query(`
+        UPDATE posts
+        SET favourite = CASE WHEN favourite @> $2::jsonb THEN favourite ELSE favourite || $2::jsonb END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `, [postId, JSON.stringify([userId])]);
+    }
+
+    await client.query('COMMIT');
+    return favoritesRow;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
-// 取消收藏：把 postId 从 users.favorites(JSONB 帖子ID列表)中移除
+// 取消收藏：把 postId 从 users.favorites 移除，同时把 userId 从该帖子的 favourite 中镜像移除
 const removeFavorite = async (userId, postId) => {
-  const result = await pool.query(`
-    UPDATE users
-    SET favorites = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
-                     FROM jsonb_array_elements(favorites) elem
-                     WHERE elem::text <> $2),
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = $1
-    RETURNING favorites
-  `, [userId, JSON.stringify(postId)]);
-  return result.rows[0] || null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(`
+      UPDATE users
+      SET favorites = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+                       FROM jsonb_array_elements(favorites) elem
+                       WHERE elem::text <> $2),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING favorites
+    `, [userId, JSON.stringify(postId)]);
+    const favoritesRow = result.rows[0] || null;
+
+    if (favoritesRow) {
+      await client.query(`
+        UPDATE posts
+        SET favourite = (SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+                         FROM jsonb_array_elements(favourite) elem
+                         WHERE elem::text <> $2),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `, [postId, JSON.stringify(userId)]);
+    }
+
+    await client.query('COMMIT');
+    return favoritesRow;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 // 判断某用户是否已收藏某帖子

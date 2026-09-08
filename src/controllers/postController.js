@@ -1,4 +1,4 @@
-const { createPost, findAllPosts, findPostById, findPostsByUserId, findLikedPostsByUserId, addFavorite, removeFavorite, isFavorited, findFavoritePostsByUserId, findRandomRecentPosts, searchPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
+const { createPost, findAllPosts, findPostById, findPostsByIds, findPostsByUserId, findLikedPostsByUserId, addFavorite, removeFavorite, isFavorited, findFavoritePostsByUserId, findRandomRecentPosts, searchPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
 const { findById } = require('../models/user');
 
 exports.createPost = async (req, res) => {
@@ -142,6 +142,47 @@ exports.getMyFavorites = async (req, res) => {
   } catch (error) {
     console.error('获取我收藏的帖子错误:', error);
     res.status(500).json({ code: 500, message: '获取我收藏的帖子失败' });
+  }
+};
+
+// ==================== 获取浏览历史的帖子 ====================
+// 客户端上传最近浏览过的帖子 ID 列表（历史记录），服务端按传入顺序把对应帖子全量返回
+exports.getHistoryPosts = async (req, res) => {
+  try {
+    // 兼容三种上传方式：JSON 数组 / JSON 字符串序列化数组 / 逗号分隔字符串
+    let postIds = req.body && (req.body.postIds ?? req.body.ids);
+    if (postIds == null) postIds = req.query && req.query.postIds;
+
+    let list = postIds;
+    if (typeof list === 'string') {
+      const trimmed = list.trim();
+      if (trimmed.startsWith('[')) {
+        try { list = JSON.parse(trimmed); } catch (e) { list = trimmed; }
+      } else {
+        list = trimmed;
+      }
+    }
+    if (!Array.isArray(list)) {
+      list = String(list).split(',').map((s) => s.trim()).filter(Boolean);
+    }
+
+    const validIds = list
+      .filter((id) => typeof id === 'string' && UUID_RE.test(id.trim()))
+      .map((id) => id.trim());
+
+    if (validIds.length === 0) {
+      return res.json({ code: 200, message: 'success', data: [] });
+    }
+
+    const posts = await findPostsByIds(validIds);
+    res.json({
+      code: 200,
+      message: 'success',
+      data: posts
+    });
+  } catch (error) {
+    console.error('获取历史浏览帖子错误:', error);
+    res.status(500).json({ code: 500, message: '获取历史浏览帖子失败' });
   }
 };
 

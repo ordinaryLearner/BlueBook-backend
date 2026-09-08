@@ -185,6 +185,35 @@ const findPostById = async (id) => {
   return formatPost(post);
 };
 
+// 按客户端上传的帖子 ID 列表批量返回帖子（用于浏览历史/已浏览过的帖子回显），
+// 保持传入顺序，帖子已被删除的对应位置跳过
+const findPostsByIds = async (postIds) => {
+  const ids = Array.isArray(postIds) ? postIds.filter(Boolean) : [];
+  if (ids.length === 0) return [];
+
+  const result = await pool.query(`
+    SELECT p.*,
+      json_build_object(
+        'id', u.id,
+        'username', u.username,
+        'account', u.account,
+        'avatar', u.avatar,
+        'bio', u.bio,
+        'join_time', u.join_time
+      ) as sender
+    FROM posts p
+    JOIN users u ON p.sender_id = u.id
+    WHERE p.id = ANY($1::uuid[])
+  `, [ids]);
+
+  const byId = new Map(result.rows.map((post) => [post.id, post]));
+  const ordered = ids
+    .map((id) => byId.get(id))
+    .filter(Boolean);
+
+  return attachCommentsToPosts(ordered);
+};
+
 const findPostsByUserId = async (userId) => {
   const result = await pool.query(`
     SELECT p.*,
@@ -417,6 +446,7 @@ module.exports = {
   createPost,
   findAllPosts,
   findPostById,
+  findPostsByIds,
   findPostsByUserId,
   findLikedPostsByUserId,
   findFavoritePostsByUserId,

@@ -1061,6 +1061,68 @@ Authorization: Bearer <token>
 
 ---
 
+### 10.5 获取浏览历史的帖子
+
+```
+POST /api/posts/history
+Authorization: Bearer <token>
+```
+
+需要登录。客户端把本地记录的**已浏览/历史帖子 ID 列表**上传给服务端，服务端返回对应的完整帖子对象数组，**顺序与上传的 ID 顺序一致**（已删除的帖子会在对应位置跳过），用于回显浏览历史。若上传列表为空或全为无效 ID，返回空数组 `[]`。
+
+**Request Body（JSON，三选一）：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `postIds` | string[] | 帖子 ID 数组（推荐），也兼容 JSON 序列化后的字符串或逗号分隔字符串 |
+| `ids` | string[] | `postIds` 的别名，二选一 |
+
+```json
+{
+  "postIds": [
+    "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+    "6d9c4e2f-1b3a-4d8f-a7e0-2b3c4d5e6f7a"
+  ]
+}
+```
+
+**Response `200`：** `data` 为完整帖子对象数组，结构同 `GET /api/posts/my` 的单帖元素（含 `sender` / `medias` / `likes` / `favourite` / `comments`），按 `postIds` 传入顺序排列。
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+      "title": "海边野餐攻略",
+      "content": "收藏这份海边野餐清单",
+      "sender": {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123"
+      },
+      "medias": [],
+      "likes": [],
+      "favourite": [],
+      "comments": [],
+      "time": "2024-01-01 00:00:00",
+      "created_at": "2024-01-01 00:00:00",
+      "updated_at": "2024-01-01 00:00:00"
+    }
+  ]
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 500 | 500 | 获取历史浏览帖子失败 |
+
+---
+
 ### 11. 获取用户信息
 
 ```

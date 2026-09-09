@@ -10,7 +10,10 @@ exports.getUserById = async (req, res) => {
     res.json({
       code: 200,
       message: 'success',
-      data: user
+      data: {
+        user,
+        token: null
+      }
     });
   } catch (error) {
     console.error('获取用户信息错误:', error);

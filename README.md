@@ -1150,7 +1150,7 @@ GET /api/users/:id
 
 无需登录。根据用户 ID 查询用户基本信息，可用于从帖子 `sender.id` 获取发送者的详细信息。
 
-返回的 User 对象通用字段如下：
+响应格式与登录/注册保持一致，`data` 固定为 `{ user, token }` 包裹对象（本接口不签发 token，故 `token` 恒为 `null`，客户端只需读取 `data.user`）。返回的 User 对象通用字段如下：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -1174,16 +1174,19 @@ GET /api/users/:id
   "code": 200,
   "message": "success",
   "data": {
-    "id": "uuid",
-    "account": "user123",
-    "username": "张三",
-    "avatar": null,
-    "background": null,
-    "bio": null,
-    "followers": ["5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"],
-    "fans": [],
-    "totalLikes": 0,
-    "join_time": "2024-01-01 00:00:00"
+    "user": {
+        "id": "uuid",
+        "account": "user123",
+        "username": "张三",
+        "avatar": null,
+        "background": null,
+        "bio": null,
+        "followers": ["5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"],
+        "fans": [],
+        "totalLikes": 0,
+        "join_time": "2024-01-01 00:00:00"
+    },
+    "token": null
   }
 }
 ```

@@ -188,7 +188,10 @@ exports.getCurrentUser = async (req, res) => {
     res.json({
       code: 200,
       message: 'success',
-      data: user
+      data: {
+        user,
+        token
+      }
     });
   } catch (error) {
     console.error('获取用户信息错误:', error);

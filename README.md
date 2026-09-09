@@ -277,23 +277,26 @@ Content-Type: application/json
 |------|------|------|------|
 | `token` | string | 是 | 登录时获取的 JWT |
 
-**Response `200`:**
+**Response `200`：**（与自动登录返回结构一致，`data` 为 `{ user, token }`）
 
 ```json
 {
   "code": 200,
   "message": "success",
   "data": {
-    "id": "uuid",
-    "account": "user123",
-    "username": "张三",
-    "avatar": null,
-    "background": null,
-    "bio": null,
-    "followers": [],
-    "fans": [],
-    "totalLikes": 0,
-    "join_time": "2024-01-01 00:00:00"
+    "user": {
+      "id": "uuid",
+      "account": "user123",
+      "username": "张三",
+      "avatar": null,
+      "background": null,
+      "bio": null,
+      "followers": [],
+      "fans": [],
+      "totalLikes": 0,
+      "join_time": "2024-01-01 00:00:00"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIs..."
   }
 }
 ```
@@ -303,7 +306,7 @@ Content-Type: application/json
 | 状态码 | code | message |
 |--------|------|---------|
 | 400 | 400 | Token不能为空 |
-| 401 | 401 | Token无效或已过期 |
+| 401 | 401 | Token无效（密钥不符）或登录已过期 |
 | 404 | 404 | 用户不存在 |
 
 ---

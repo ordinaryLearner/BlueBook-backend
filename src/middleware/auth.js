@@ -1,8 +1,6 @@
 ﻿// src/middleware/auth.js
-const jwt = require('jsonwebtoken');
+const { verifyToken } = require('../utils/token');
 const { userExists } = require('../models/user');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'bluebook-super-secret-key-2024';
 
 const authenticate = async (req, res, next) => {
   try {
@@ -14,11 +12,15 @@ const authenticate = async (req, res, next) => {
 
     const token = authHeader.substring(7);
     
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return res.status(401).json({ code: 401, message: 'Token无效或已过期' });
+    // 统一从 utils/token 取值，避免与签发端密钥不一致
+    const { decoded, error } = verifyToken(token);
+    if (error) {
+      console.error('认证失败:', error);
+      const expired = error.name === 'TokenExpiredError';
+      return res.status(401).json({
+        code: 401,
+        message: expired ? '登录已过期，请重新登录' : 'Token无效'
+      });
     }
 
     // 轻量校验用户仍存在，避免每个认证请求都做关注列表的联表开销

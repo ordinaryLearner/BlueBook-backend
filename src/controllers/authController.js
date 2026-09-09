@@ -1,7 +1,16 @@
 ﻿// src/controllers/authController.js
-const jwt = require('jsonwebtoken');
 const { findByAccount, createUser, findById } = require('../models/user');
-const { generateToken, JWT_SECRET } = require('../utils/token');
+const { generateToken, verifyToken } = require('../utils/token');
+
+// 把校验失败转换成统一的错误对象，便于各处复用并区分“真过期”与“签名/密钥不符”
+const tokenVerifyError = (error) => {
+  console.error('Token 校验失败:', error);
+  const expired = error.name === 'TokenExpiredError';
+  return {
+    code: 401,
+    message: expired ? '登录已过期，请重新登录' : 'Token无效'
+  };
+};
 
 // ==================== 注册 ====================
 exports.register = async (req, res) => {
@@ -127,14 +136,9 @@ exports.autoLogin = async (req, res) => {
     }
 
     // 验证 Token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return res.status(401).json({ 
-        code: 401, 
-        message: 'Token无效或已过期' 
-      });
+    const { decoded, error } = verifyToken(token);
+    if (error) {
+      return res.status(401).json(tokenVerifyError(error));
     }
 
     // 检查 Token 中的 userId 是否与当前账号匹配
@@ -171,11 +175,9 @@ exports.getCurrentUser = async (req, res) => {
       return res.status(400).json({ code: 400, message: 'Token不能为空' });
     }
 
-    let decoded;
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      return res.status(401).json({ code: 401, message: 'Token无效或已过期' });
+    const { decoded, error } = verifyToken(token);
+    if (error) {
+      return res.status(401).json(tokenVerifyError(error));
     }
 
     const user = await findById(decoded.userId);

@@ -75,6 +75,25 @@ exports.getMyPosts = async (req, res) => {
   }
 };
 
+// 客户端上传要查看的用户 ID(userId)，返回该用户发布的帖子列表
+exports.getUserPosts = async (req, res) => {
+  try {
+    const userId = (req.params.userId || '').trim();
+    if (!userId) {
+      return res.status(400).json({ code: 400, message: '用户ID(userId)不能为空' });
+    }
+    const posts = await findPostsByUserId(userId);
+    res.json({
+      code: 200,
+      message: 'success',
+      data: posts
+    });
+  } catch (error) {
+    console.error('获取指定用户的帖子错误:', error);
+    res.status(500).json({ code: 500, message: '获取帖子列表失败' });
+  }
+};
+
 exports.getMyLikedPosts = async (req, res) => {
   try {
     const posts = await findLikedPostsByUserId(req.userId);

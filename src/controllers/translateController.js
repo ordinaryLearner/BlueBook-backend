@@ -16,7 +16,8 @@ exports.translateText = async (req, res) => {
 
     const { translation, error } = await translate(text);
     if (error || !translation) {
-      return res.status(500).json({ code: 500, message: '翻译失败，请稍后重试' });
+      // 具体的上游失败原因通过 data.reason 返回，便于客户端/联调时定位（message 仍是给用户看的友好文案）
+      return res.status(500).json({ code: 500, message: '翻译失败，请稍后重试', data: { reason: error || '响应中无翻译结果' } });
     }
 
     res.json({ code: 200, message: 'success', data: { translation } });

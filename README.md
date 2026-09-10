@@ -1706,7 +1706,7 @@ Content-Type: application/json
 |------|------|------|------|
 | `text` | string | 是 | 待翻译文本，不能为空，最长 5000 个字符 |
 
-**Response `200`:**
+**Response `200`（成功）:**
 
 ```json
 {
@@ -1718,6 +1718,36 @@ Content-Type: application/json
 }
 ```
 
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `data.translation` | string | 译文 |
+
+**Response `400`（参数错误）:**
+
+```json
+{
+  "code": 400,
+  "message": "翻译内容不能为空"
+}
+```
+
+**Response `500`（上游调用失败）:**
+
+```json
+{
+  "code": 500,
+  "message": "翻译失败，请稍后重试",
+  "data": {
+    "reason": "InvalidAccessKey(CodeN:100009) The security token[AKLTxxx] included in the request is invalid."
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `message` | string | 给用户展示的友好文案，固定为 `翻译失败，请稍后重试` |
+| `data.reason` | string | 上游失败的**原始原因**，仅供联调/日志定位，不建议直接展示给用户 |
+
 **错误码：**
 
 | 状态码 | code | message |
@@ -1726,7 +1756,14 @@ Content-Type: application/json
 | 400 | 400 | 翻译内容长度不能超过5000个字符 |
 | 500 | 500 | 翻译失败，请稍后重试 |
 
-> 说明：`data.translation` 为翻译结果。若上游火山引擎调用失败（网络异常、签名或密钥错误、额度不足等），统一返回 `500` 与 `翻译失败，请稍后重试`，具体原因记录在服务端日志中。
+> 说明：`data.translation` 为翻译结果。若上游火山引擎调用失败（网络异常、签名或密钥错误、额度不足等），统一返回 `500` 与 `翻译失败，请稍后重试`，具体原因见 `data.reason`，同时记录在服务端日志中。
+>
+> 常见 `data.reason` 及含义：
+> - `timeout` / `ENOTFOUND` / `ECONNREFUSED` / `socket hang up` —— 服务器无法访问 `open.volcengineapi.com`（如部署在境外服务器）；
+> - `SignatureDoesNotMatch` —— 签名不匹配，通常为 `.env` 中的密钥与实际使用的不一致；
+> - `InvalidAccessKey` —— AccessKeyID 无效；
+> - `account status abnormal` / `service not activated` —— 账号状态异常或机器翻译服务未开通；
+> - `balance insufficient` —— 账户余额不足。
 >
 > 实现备注（火山引擎 V4 签名的几个坑）：
 > - `SecretAccessKey` 原样参与 HMAC 签名，**不要做 base64 解码**；

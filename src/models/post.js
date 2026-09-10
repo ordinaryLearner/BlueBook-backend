@@ -12,22 +12,32 @@ const formatPost = (post) => {
   return post;
 };
 
-const createPost = async (title, content, senderId, imageUrls) => {
+// post_medias.type 的取值；列宽 VARCHAR(10)，两个值都放得下
+const MEDIA_TYPE = { IMAGE: 'IMAGE', VIDEO: 'VIDEO' };
+
+const insertMedia = (postId, type, url, sortOrder) =>
+  pool.query(
+    'INSERT INTO post_medias (post_id, type, url, sort_order) VALUES ($1, $2, $3, $4)',
+    [postId, type, url, sortOrder]
+  );
+
+// medias: [{ type, url }, ...]，顺序即 sort_order
+const createPost = async (title, content, senderId, medias = []) => {
   const postResult = await pool.query(
     'INSERT INTO posts (title, content, sender_id) VALUES ($1, $2, $3) RETURNING *',
     [title, content, senderId]
   );
   const post = postResult.rows[0];
 
-  for (let i = 0; i < imageUrls.length; i++) {
-    await pool.query(
-      'INSERT INTO post_medias (post_id, type, url, sort_order) VALUES ($1, $2, $3, $4)',
-      [post.id, 'IMAGE', imageUrls[i], i]
-    );
+  for (let i = 0; i < medias.length; i++) {
+    await insertMedia(post.id, medias[i].type, medias[i].url, i);
   }
 
   return post;
 };
+
+// 视频需先上传拿到 CDN 地址才能入库，故支持建帖后单独追加媒体
+const addMedia = (postId, type, url, sortOrder = 0) => insertMedia(postId, type, url, sortOrder);
 
 const findMediasByPostId = async (postId) => {
   const result = await pool.query(
@@ -459,5 +469,7 @@ module.exports = {
   findCommentById,
   findFullCommentById,
   addLike,
-  removeLike
+  removeLike,
+  MEDIA_TYPE,
+  addMedia
 };

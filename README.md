@@ -43,6 +43,7 @@ npm start
 | `IMGBB_API_KEY` | ImgBB 图床 API 密钥（用于图片上传） | `d35841f781c7eb9c8bd4f0e6f6d00b6a` |
 | `VOLC_ACCESS_KEY` | 火山引擎机器翻译 AccessKeyID | - |
 | `VOLC_SECRET_KEY` | 火山引擎机器翻译 SecretAccessKey（原样使用，不做解码） | - |
+| `PUTPUT_TOKEN` | PutPut 文件存储 token（视频上传用）。留空时服务端自动调 `/auth/guest` 获取并缓存，但访客 token 每 IP 每天限 3 个，建议手动获取一次后填入长期复用 | 空 |
 
 ## API 文档
 
@@ -382,6 +383,83 @@ Content-Type: application/json
 |--------|------|---------|
 | 401 | 401 | 请先登录 |
 | 500 | 500 | 发布失败，请稍后重试 |
+
+---
+
+### 6.1 发布视频帖子
+
+```
+POST /api/posts/video
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+```
+
+需要登录。客户端直接上传**视频文件本身**，服务端接收后转存到 PutPut（Cloudflare R2），拿到 CDN 直链后以 `type = "VIDEO"` 存入 `post_medias` 表。读取链路与图片帖完全一致——客户端仍从 `medias` 数组取数据，靠 `type` 区分 `IMAGE` / `VIDEO`。
+
+**Request（multipart/form-data）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `video` | file | 是 | 视频文件，MIME 必须为 `video/*`，单个文件不超过 100MB |
+| `title` | string | 否 | 帖子标题 |
+| `content` | string | 否 | 帖子正文内容 |
+
+`sender_id` 由服务端从 JWT 中取（当前登录用户），客户端无需传递。一个视频帖只支持一个视频。
+
+```bash
+curl -X POST http://localhost:3000/api/posts/video \
+  -H "Authorization: Bearer <token>" \
+  -F "title=标题" \
+  -F "content=正文" \
+  -F "video=@/path/to/clip.mp4;type=video/mp4"
+```
+
+**Response `201`：**
+
+```json
+{
+  "code": 200,
+  "message": "发布成功",
+  "data": {
+    "id": "uuid",
+    "title": "标题",
+    "content": "正文",
+    "sender": { "...": "同上" },
+    "medias": [
+      {
+        "id": "uuid",
+        "type": "VIDEO",
+        "url": "https://cdn.putput.io/xxxx/xxxx/clip.mp4"
+      }
+    ],
+    "likes": [],
+    "favourite": [],
+    "comments": [],
+    "time": "2024-01-01 00:00:00",
+    "created_at": "2024-01-01 00:00:00",
+    "updated_at": "2024-01-01 00:00:00"
+  }
+}
+```
+
+`medias[0].url` 为可直接播放的 CDN 直链，客户端拿到后即可交给播放器使用。
+
+**错误码：**
+
+| 状态码 | code | message | 场景 |
+|--------|------|---------|------|
+| 400 | 400 | 请选择要上传的视频 | 未携带 `video` 文件 |
+| 400 | 400 | 仅支持上传视频文件 | MIME 不是 `video/*`，`data.reason` 给出具体类型 |
+| 401 | 401 | 请先登录 | 未登录 |
+| 413 | 413 | 视频文件过大 | 超过 100MB（`data.reason` 给出上限） |
+| 500 | 500 | 视频上传失败，请稍后重试 | 上游存储失败，`data.reason` 给出原因 |
+| 500 | 500 | 发布失败，请稍后重试 | 上传成功但入库失败（服务端会尽力删除已上传文件） |
+
+**已知限制：**
+
+- 上游 PutPut 访客计划单文件上限 **100MB**，存储总量 1GB，服务端与本接口保持一致。
+- 访客 token 每 IP 每天最多申请 **3 个**，因此强烈建议在 `.env` 中配置 `PUTPUT_TOKEN` 长期复用，避免线上频繁冷启动耗尽额度。
+- 视频先上传到 PutPut、再写入数据库。若入库环节失败，服务端会尝试调用 PutPut 删除接口回滚；若删除也失败，会在上游残留一个孤儿文件。
 
 ---
 
@@ -1784,6 +1862,24 @@ Content-Type: application/json
 3. 后端将 URL 数组直接保存到数据库
 4. 返回的 `medias` 字段中即为保存的图片 URL 列表
 
+## 视频存储说明
+
+视频与图片**不同**：客户端不再需要自己找图床，而是把视频文件直接上传给后端，后端负责转存到 PutPut 并返回 CDN 地址。
+
+### Android 端视频发布流程
+
+1. 客户端以 `multipart/form-data` 调用 `POST /api/posts/video`，携带 `video`（文件）、`title`、`content`
+2. 后端接收文件（内存缓冲，不落盘），依次调用 PutPut 的 `POST /upload/presign` → `PUT <presigned_url>` → `POST /upload/confirm`
+3. 从 confirm 响应取 `file.public_url`（CDN 直链），建帖并以 `type = "VIDEO"` 写入 `post_medias`
+4. 返回的 `medias[0].url` 即为可直接播放的视频地址
+
+### PutPut 交互细节
+
+- 上传流程必须携带 `Authorization: Bearer <PUTPUT_TOKEN>`（`presign` / `confirm` 两步），但直传 R2 的 `PUT` **不能带** Authorization，且 `Content-Type` 必须与 presign 时声明的 `content_type` 完全一致。
+- 服务端缓存 token（有效期 30 天），并在收到 `UNAUTHORIZED` 时自动刷新重试一次。
+- 服务端做过实测：`video/mp4` 被访客 token 正常放行，上传后可正常下载。
+- 未配置 `PUTPUT_TOKEN` 时服务端会调用 `POST /auth/guest` 自动获取，但访客额度为每 IP 每天 3 个，**生产环境务必手动配置 `PUTPUT_TOKEN`**。
+
 ## 自动登录流程（前端参考）
 
 1. 用户首次登录，调用 `POST /api/auth/login`，获取 `token` 并保存到本地（如 localStorage）。
@@ -1825,7 +1921,7 @@ CREATE TABLE posts (
 CREATE TABLE post_medias (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-  type       VARCHAR(10) NOT NULL DEFAULT 'IMAGE',
+  type       VARCHAR(10) NOT NULL DEFAULT 'IMAGE',  -- IMAGE / VIDEO
   url        TEXT NOT NULL,
   sort_order INT DEFAULT 0
 );

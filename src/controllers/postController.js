@@ -1,5 +1,9 @@
-const { createPost, findAllPosts, findPostById, findPostsByIds, findPostsByUserId, findLikedPostsByUserId, addFavorite, removeFavorite, isFavorited, findFavoritePostsByUserId, findRandomRecentPosts, searchPosts, createComment, findCommentById, findFullCommentById } = require('../models/post');
+const { createPost, findAllPosts, findPostById, findPostsByIds, findPostsByUserId, findLikedPostsByUserId, addFavorite, removeFavorite, isFavorited, findFavoritePostsByUserId, findRandomRecentPosts, searchPosts, createComment, findCommentById, findFullCommentById, MEDIA_TYPE, addMedia } = require('../models/post');
 const { findById } = require('../models/user');
+const { uploadBuffer, deleteFile } = require('../utils/putput');
+
+// 与 PutPut 访客计划的单文件上限保持一致
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 
 exports.createPost = async (req, res) => {
   try {
@@ -29,9 +33,9 @@ exports.createPost = async (req, res) => {
 
     const post = await createPost(
       title || '',
-      content,
+      content || '',
       req.userId,
-      imageUrls
+      imageUrls.map((url) => ({ type: MEDIA_TYPE.IMAGE, url }))
     );
 
     const fullPost = await findPostById(post.id);
@@ -43,6 +47,75 @@ exports.createPost = async (req, res) => {
     });
   } catch (error) {
     console.error('发布帖子错误:', error);
+    res.status(500).json({ code: 500, message: '发布失败，请稍后重试' });
+  }
+};
+
+// 视频帖：multipart/form-data，字段 video(file) + title + content
+exports.createVideoPost = async (req, res) => {
+  let uploaded = null;
+  try {
+    const { title, content } = req.body;
+
+    if (!req.userId) {
+      return res.status(401).json({ code: 401, message: '请先登录' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ code: 400, message: '请选择要上传的视频' });
+    }
+
+    // 先按 MIME 拦一道，避免把任意文件转发给上游存储
+    if (!req.file.mimetype || !req.file.mimetype.startsWith('video/')) {
+      return res.status(400).json({
+        code: 400,
+        message: '仅支持上传视频文件',
+        data: { reason: `不支持的视频类型: ${req.file.mimetype || '未知'}` }
+      });
+    }
+
+    if (req.file.size > MAX_VIDEO_BYTES) {
+      return res.status(413).json({
+        code: 413,
+        message: '视频文件过大',
+        data: { reason: `单个视频不能超过 ${Math.floor(MAX_VIDEO_BYTES / 1024 / 1024)}MB` }
+      });
+    }
+
+    const { url, fileId, error } = await uploadBuffer(req.file.buffer, {
+      filename: req.file.originalname || 'video',
+      contentType: req.file.mimetype
+    });
+
+    if (error || !url) {
+      return res.status(500).json({
+        code: 500,
+        message: '视频上传失败，请稍后重试',
+        data: { reason: error || '上传后未返回下载地址' }
+      });
+    }
+
+    uploaded = { url, fileId };
+
+    const post = await createPost(title || '', content || '', req.userId, []);
+    await addMedia(post.id, MEDIA_TYPE.VIDEO, url, 0);
+
+    const fullPost = await findPostById(post.id);
+
+    res.status(201).json({
+      code: 200,
+      message: '发布成功',
+      data: fullPost
+    });
+  } catch (error) {
+    console.error('发布视频帖子错误:', error);
+    // 视频已上传但建帖失败时尽力删除，避免上游残留孤儿文件
+    if (uploaded && uploaded.fileId) {
+      const rollback = await deleteFile(uploaded.fileId);
+      if (!rollback.ok) {
+        console.error('回滚删除视频失败:', uploaded.fileId, rollback.error);
+      }
+    }
     res.status(500).json({ code: 500, message: '发布失败，请稍后重试' });
   }
 };

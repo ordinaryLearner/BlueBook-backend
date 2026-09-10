@@ -138,8 +138,11 @@ const initDatabase = async () => {
       WHERE table_name = 'comments' AND column_name = 'likes' LIMIT 1
     `);
     if (likesType.rows.length > 0 && likesType.rows[0].data_type !== 'jsonb') {
+      // 必须先 DROP DEFAULT：带默认值的列 PostgreSQL 无法自动转换类型，
+      // 会报 "default for column cannot be cast automatically"
       await pool.query(`
         ALTER TABLE comments
+        ALTER COLUMN likes DROP DEFAULT,
         ALTER COLUMN likes TYPE JSONB USING '[]'::jsonb,
         ALTER COLUMN likes SET DEFAULT '[]'::jsonb,
         ALTER COLUMN likes SET NOT NULL

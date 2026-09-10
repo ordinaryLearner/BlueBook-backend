@@ -311,8 +311,15 @@ exports.getRandomPosts = async (req, res) => {
       excludeIds = parseExcludeIds(req.query && req.query.excludeIds);
     }
 
+    // 可选按媒体类型过滤：type=IMAGE 只返回图片帖，type=VIDEO 只返回视频帖，不传则不限
+    const rawType = (req.body && req.body.type) || (req.query && req.query.type);
+    const mediaType = parseMediaType(rawType);
+    if (rawType != null && String(rawType).trim() !== '' && mediaType === null) {
+      return res.status(400).json({ code: 400, message: 'type 参数只能是 IMAGE 或 VIDEO' });
+    }
+
     const LIMIT = 10;
-    const posts = await findRandomRecentPosts(LIMIT, excludeIds);
+    const posts = await findRandomRecentPosts(LIMIT, excludeIds, mediaType);
 
     // 剩余帖子不足一条时，说明已无更多可获取的数据，message 提示客户端停止刷新/加载
     const message = posts.length < LIMIT ? 'NoMore' : 'success';
@@ -326,6 +333,14 @@ exports.getRandomPosts = async (req, res) => {
     console.error('获取随机帖子错误:', error);
     res.status(500).json({ code: 500, message: '获取随机帖子失败' });
   }
+};
+
+// 归一化媒体类型参数：接受 IMAGE/VIDEO（忽略大小写与空白），非法值返回 null
+const parseMediaType = (value) => {
+  if (value == null) return null;
+  const normalized = String(value).trim().toUpperCase();
+  if (normalized === MEDIA_TYPE.IMAGE || normalized === MEDIA_TYPE.VIDEO) return normalized;
+  return null;
 };
 
 // 从客户端上传的"已加载帖子"中提取帖子 id 数组用于排除。

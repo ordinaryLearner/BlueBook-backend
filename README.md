@@ -705,13 +705,37 @@ POST /api/posts/random
 
 客户端可**上传已获取的帖子 ID**（`excludeIds` 数组，JSON 请求体），服务端会**排除这些帖子**后从剩余帖子中随机返回 10 条，用于分页下拉刷新/加载更多时避免重复推荐。不带 `excludeIds` 时行为不变。
 
+**按媒体类型筛选（可选）：**
+
+可通过 `type` 参数只获取某一类型的帖子，用于把图片推荐流和视频推荐流拆开：
+
+| 取值 | 说明 |
+|------|------|
+| 不传 | 不限类型，图片帖、视频帖、纯文本帖混合返回 |
+| `IMAGE` | 只返回**至少含一张图片**的帖子 |
+| `VIDEO` | 只返回**至少含一个视频**的帖子 |
+
+取值不区分大小写（`image` / `Video` 均可）。传入其他值返回 `400`。纯文本帖（无任何媒体）在按类型筛选时会被排除。
+
 使用建议：Android 端 Retrofit 的 **GET 请求无法携带请求体**，因此请使用 `POST /api/posts/random` 并携带 `excludeIds` 请求体；`GET /api/posts/random` 保留用于无需排除（或通过 `?excludeIds=id1,id2` 查询参数排除）的场景。
+
+```bash
+# 只要图片帖
+GET /api/posts/random?type=IMAGE
+# 只要视频帖（可与 excludeIds 组合）
+GET /api/posts/random?type=VIDEO&excludeIds=id1,id2
+
+# POST 方式把 type 放进请求体
+POST /api/posts/random
+{"type": "VIDEO", "excludeIds": ["id1"]}
+```
 
 **Request Body（可选，`content-type: application/json`，用于 `POST`）：**
 
 ```json
 {
-  "excludeIds": ["5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f", "6d9c4e2f-1b3a-4d8f-a7e0-2b3c4d5e6f7a"]
+  "excludeIds": ["5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f", "6d9c4e2f-1b3a-4d8f-a7e0-2b3c4d5e6f7a"],
+  "type": "IMAGE"
 }
 ```
 
@@ -829,9 +853,17 @@ POST /api/posts/random
 
 - `data` 是 **JSON 数组**，长度 ≤ 10（数据库中较新帖子不足 10 条时按实际数量返回）
 - 请求体 `excludeIds`（数组，`POST` 或 GET 的 `query` 参数）用于排除客户端**已获取**的帖子 ID；匹配到这些 ID 的帖子不会被返回
+- 可选参数 `type`（`IMAGE` / `VIDEO`，大小写不敏感）用于只返回对应媒体类型的帖子；传入其他值返回 `400`
 - Android 端 Retrofit 请用 `POST /api/posts/random` 并在请求体中上传 `excludeIds`
 - 每条帖子的结构完全相同，Android 端可解析为 `List<Post>`
-- `sender` 为完整的用户信息对象；`medias` 为图片列表（可为空数组）；`likes` 为点赞该帖的用户 ID 列表；`favourite` 为收藏该帖的用户 ID 列表（两者均为 uuid 字符串数组，可为空）；`comments` 为评论列表（可为空数组）
+- `sender` 为完整的用户信息对象；`medias` 为媒体列表（可为空数组，元素含 `type`（`IMAGE`/`VIDEO`）与 `url`）；`likes` 为点赞该帖的用户 ID 列表；`favourite` 为收藏该帖的用户 ID 列表（两者均为 uuid 字符串数组，可为空）；`comments` 为评论列表（可为空数组）
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | type 参数只能是 IMAGE 或 VIDEO |
+| 500 | 500 | 获取随机帖子失败 |
 
 ---
 

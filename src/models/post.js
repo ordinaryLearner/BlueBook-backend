@@ -351,7 +351,8 @@ const searchPosts = async (keyword, limit = 10, excludeIds = []) => {
   return attachCommentsToPosts(result.rows);
 };
 
-const findRandomRecentPosts = async (limit = 10, excludeIds = []) => {
+// mediaType 为 'IMAGE' / 'VIDEO' 时，只返回含该类型媒体的帖子；为 null 时不限类型
+const findRandomRecentPosts = async (limit = 10, excludeIds = [], mediaType = null) => {
   const ids = Array.isArray(excludeIds) ? excludeIds.filter(Boolean) : [];
   const result = await pool.query(`
     SELECT p.*,
@@ -367,10 +368,14 @@ const findRandomRecentPosts = async (limit = 10, excludeIds = []) => {
       SELECT * FROM posts ORDER BY created_at DESC LIMIT 100
     ) p
     JOIN users u ON p.sender_id = u.id
-    WHERE ($1::uuid[] IS NULL) OR NOT (p.id = ANY($1::uuid[]))
+    WHERE (($1::uuid[] IS NULL) OR NOT (p.id = ANY($1::uuid[])))
+      AND ($3::text IS NULL OR EXISTS (
+        SELECT 1 FROM post_medias m
+        WHERE m.post_id = p.id AND m.type = $3
+      ))
     ORDER BY RANDOM()
     LIMIT $2
-  `, [ids.length > 0 ? ids : null, limit]);
+  `, [ids.length > 0 ? ids : null, limit, mediaType]);
 
   return attachCommentsToPosts(result.rows);
 };

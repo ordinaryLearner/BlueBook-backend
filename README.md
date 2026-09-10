@@ -41,6 +41,8 @@ npm start
 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 数据库独立参数（`DATABASE_URL` 为空时生效） | `localhost` / `5432` / `postgres` / 空 / `bluebook` |
 | `NODE_ENV` | 运行环境，`production` 时启用 SSL | - |
 | `IMGBB_API_KEY` | ImgBB 图床 API 密钥（用于图片上传） | `d35841f781c7eb9c8bd4f0e6f6d00b6a` |
+| `VOLC_ACCESS_KEY` | 火山引擎机器翻译 AccessKeyID | - |
+| `VOLC_SECRET_KEY` | 火山引擎机器翻译 SecretAccessKey（原样使用，不做解码） | - |
 
 ## API 文档
 
@@ -1680,6 +1682,59 @@ Content-Type: application/json
 | 404 | 404 | 帖子不存在 |
 | 404 | 404 | 评论不存在 |
 | 500 | 500 | 取消点赞失败，请稍后重试 |
+
+---
+
+### 17. 文本翻译
+
+```
+POST /api/translate
+Content-Type: application/json
+```
+
+无需认证。服务端代理调用火山引擎机器翻译接口，目标语言固定为中文（`zh`），源语言由火山引擎自动识别。客户端无需也无法接触火山引擎密钥。
+
+**Request Body:**
+
+```json
+{
+  "text": "Hello world"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `text` | string | 是 | 待翻译文本，不能为空，最长 5000 个字符 |
+
+**Response `200`:**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "translation": "你好世界"
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | 翻译内容不能为空 |
+| 400 | 400 | 翻译内容长度不能超过5000个字符 |
+| 500 | 500 | 翻译失败，请稍后重试 |
+
+> 说明：`data.translation` 为翻译结果。若上游火山引擎调用失败（网络异常、签名或密钥错误、额度不足等），统一返回 `500` 与 `翻译失败，请稍后重试`，具体原因记录在服务端日志中。
+>
+> 实现备注（火山引擎 V4 签名的几个坑）：
+> - `SecretAccessKey` 原样参与 HMAC 签名，**不要做 base64 解码**；
+> - 密钥链第一步为 `HMAC(SecretAccessKey, dateStamp)`，**不加 `"VOLC"` 前缀**；
+> - 参与签名的头只有 `host;x-content-sha256;x-date`，**`content-type` 不参与签名**；
+> - 规范化头块与 signedHeaders 之间需要一个**空行**；
+> - 源语言自动识别需**省略** `SourceLanguage` 字段，传字面量 `"auto"` 会被上游拒绝（`invalid source_language`）；
+> - 上游失败时 HTTP 状态码仍可能是 `200`，错误在响应体的 `ResponseMetadata.Error` 中，需显式判断。
 
 ## 图片存储说明
 

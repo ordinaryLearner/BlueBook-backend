@@ -31,6 +31,16 @@ exports.createPost = async (req, res) => {
     collect('images');
     collect('imageUrls');
 
+    // 拒绝空媒体帖：没有图片时，至少要有一段正文，否则会写出 medias 为空的帖子，
+    // 客户端拿到空数组后无法区分"纯文本帖"和"发布失败"，容易在判空处崩溃。
+    if (imageUrls.length === 0 && !(content && String(content).trim())) {
+      return res.status(400).json({
+        code: 400,
+        message: '请至少上传一张图片或填写正文内容',
+        data: { reason: '图片为空且正文为空' }
+      });
+    }
+
     const post = await createPost(
       title || '',
       content || '',

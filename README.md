@@ -1883,6 +1883,247 @@ Content-Type: application/json
 > - 源语言自动识别需**省略** `SourceLanguage` 字段，传字面量 `"auto"` 会被上游拒绝（`invalid source_language`）；
 > - 上游失败时 HTTP 状态码仍可能是 `200`，错误在响应体的 `ResponseMetadata.Error` 中，需显式判断。
 
+---
+
+### 18. 发送消息
+
+```
+POST /api/messages
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+需要登录。客户端上传一条消息并保存到服务端，对应客户端实体 `data class Message(id, postId, sender, receiver, text, time, isRead, type)` 与枚举 `MessageType { TEXT, POST, COMMENT }`。服务端**只保存发送者/接收者的用户 ID**（`sender_id` / `receiver_id` 外键指向 `users` 表），返回时 JOIN `users` 展开为完整 `sender` / `receiver`。`sender` 一律以登录 token 中的用户为准，请求体里的 `sender` 会被忽略；`time` 以服务端写入时间为准。会话 ID `conversationId` **由服务端推导**（收发双方用户 ID 排序后拼接，见下方说明），请求体无需上传。
+
+**Request Body（JSON）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | string | 否 | 消息 ID；若为合法 UUID 则用作主键（保留客户端本地生成的 ID），否则由服务端生成 |
+| `receiverId` | string | 是 | 接收者用户 ID（也可通过 `receiver.id` 传入，兼容客户端序列化的 `receiver` 对象） |
+| `text` | string | 是 | 消息正文，不能为空 |
+| `type` | string | 否 | 消息类型：`TEXT`（默认）/ `POST` / `COMMENT`，忽略大小写 |
+| `postId` | string | 否 | 关联帖子 ID（`POST` / `COMMENT` 类型时使用），需为合法 UUID |
+
+> `conversationId` 无需上传，由服务端根据 `senderId` 与 `receiverId` 自动生成。
+
+示例：
+
+```json
+{
+  "id": "f1e2d3c4-b5a6-4978-8a9b-0c1d2e3f4a5b",
+  "receiverId": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+  "text": "这个帖子拍得真好看！",
+  "type": "POST",
+  "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f"
+}
+```
+
+**Response `201`：**
+
+```json
+{
+  "code": 200,
+  "message": "发送成功",
+  "data": {
+    "id": "f1e2d3c4-b5a6-4978-8a9b-0c1d2e3f4a5b",
+    "conversationId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d_b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+    "postId": "5c8b3d1e-9a2f-4c7e-b6d0-1a2b3c4d5e6f",
+    "sender": {
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "username": "张三",
+      "account": "user123",
+      "avatar": null
+    },
+    "receiver": {
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "username": "李四",
+      "account": "user456",
+      "avatar": null
+    },
+    "text": "这个帖子拍得真好看！",
+    "time": "2024-01-01 00:00:00",
+    "isRead": false,
+    "type": "POST"
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 400 | 400 | 接收者ID(receiverId)不能为空 |
+| 400 | 400 | 接收者ID(receiverId)格式不正确 |
+| 400 | 400 | 不能给自己发送消息 |
+| 400 | 400 | type 只能是 TEXT、POST 或 COMMENT |
+| 400 | 400 | 消息内容(text)不能为空 |
+| 400 | 400 | 帖子ID(postId)格式不正确 |
+| 400 | 400 | 接收者或关联帖子不存在 |
+| 500 | 500 | 发送失败，请稍后重试 |
+
+**说明：** `data` 中返回保存后的完整消息，字段命名对齐客户端 `Message`（`isRead`、`time` 为格式化后的字符串）。`isRead` 新建时固定为 `false`（服务端默认值）。
+
+**关于 `conversationId`：** 由服务端根据收发双方用户 ID 推导——把两个用户 ID 转小写后按字典序排序，用 `_` 连接，形如 `<较小的用户ID>_<较大的用户ID>`。因此**同一对用户的会话 ID 恒定**：无论 A 发给 B 还是 B 发给 A，都是同一个 `conversationId`，客户端可直接用它聚合会话。该值不接受客户端上传，服务端每次写入时自行计算。`conversationId` 在消息创建与查询时保持一致，历史数据会由 `initDatabase()` 自动回填。
+
+---
+
+### 18.1 获取会话消息列表
+
+```
+GET /api/messages/conversation/:userId
+Authorization: Bearer <token>
+```
+
+需要登录。返回**当前登录用户**与路径参数 `userId` 对应用户之间的全部消息（双向），按时间正序（`created_at ASC`），供客户端打开聊天页时拉取历史记录。路径参数 `userId` 为对方用户 ID。内部按上文推导出的 `conversationId` 命中索引查询，结果与谁先发起无关。
+
+**Response `200`：**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": "f1e2d3c4-b5a6-4978-8a9b-0c1d2e3f4a5b",
+      "conversationId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d_b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "postId": null,
+      "sender": {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123",
+        "avatar": null
+      },
+      "receiver": {
+        "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        "username": "李四",
+        "account": "user456",
+        "avatar": null
+      },
+      "text": "在吗？",
+      "time": "2024-01-01 00:00:00",
+      "isRead": true,
+      "type": "TEXT"
+    }
+  ]
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 400 | 400 | 对方用户ID(userId)不能为空 |
+| 400 | 400 | 对方用户ID(userId)格式不正确 |
+| 500 | 500 | 获取会话消息失败 |
+
+**说明：** `data` 为消息数组，没有消息时返回空数组 `[]`。
+
+---
+
+### 18.2 标记会话已读
+
+```
+POST /api/messages/read
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+需要登录。把**对方发给当前用户**的未读消息批量置为已读（`isRead = true`）。典型场景：客户端打开与某人的聊天页后调用，清除该会话未读。
+
+**Request Body（JSON）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userId` | string | 是 | 对方用户 ID（也兼容 `receiverId` / `receiver.id` 写法） |
+
+示例：
+
+```json
+{
+  "userId": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
+}
+```
+
+**Response `200`：**
+
+```json
+{
+  "code": 200,
+  "message": "已读",
+  "data": { "updated": 3 }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 400 | 400 | 对方用户ID(userId)不能为空 |
+| 400 | 400 | 对方用户ID(userId)格式不正确 |
+| 500 | 500 | 标记已读失败，请稍后重试 |
+
+**说明：** `data.updated` 为本次被置为已读的消息条数；若本就没有未读消息则返回 `0`。
+
+---
+
+### 18.3 拉取未读消息（返回即已读）
+
+```
+GET /api/messages/unread
+Authorization: Bearer <token>
+```
+
+也可用 `POST /api/messages/unread`（无需请求体）。需要登录。返回**当前登录用户收到的全部未读消息**（`receiver_id` 为当前用户且 `is_read = false`），按时间正序。**返回的同时这批消息会被标记为已读**，因此后续再调用不会再返回它们（即"取走即消费"语义，适合客户端启动或前台恢复时一次性拉取离线消息）。
+
+**Response `200`：**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": "f1e2d3c4-b5a6-4978-8a9b-0c1d2e3f4a5b",
+      "conversationId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d_b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "postId": null,
+      "sender": {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "username": "张三",
+        "account": "user123",
+        "avatar": null
+      },
+      "receiver": {
+        "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        "username": "李四",
+        "account": "user456",
+        "avatar": null
+      },
+      "text": "在吗？",
+      "time": "2024-01-01 00:00:00",
+      "isRead": true,
+      "type": "TEXT"
+    }
+  ]
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 401 | 401 | 请先登录 / Token无效或已过期 / 用户不存在 |
+| 500 | 500 | 获取未读消息失败 |
+
+**说明：**
+- `data` 为本次取走的未读消息数组，没有未读消息时返回空数组 `[]`。
+- 读取与"标记已读"在服务端**同一条 SQL（`UPDATE ... RETURNING`）中原子完成**，因此并发重复调用时只有一个请求能拿到某条消息，不会重复下发。
+- 返回的 `isRead` 字段为 `true`（因为已随本次返回置为已读），客户端可据此直接更新本地状态。
+- 该接口与 `18.2 标记会话已读` 的区别：18.2 是按某个会话批量清除未读，本接口是不区分会话、一次性取走全部未读。
+
 ## 图片存储说明
 
 当前版本**不存储图片文件**，也不经过任何图床服务。客户端直接将图片的 URL（URI）数组随发布请求一起提交，后端只把这些 URL 原样存入 `post_medias` 表的 `url` 字段。
@@ -1968,6 +2209,26 @@ CREATE TABLE comments (
   likes       INT DEFAULT 0,
   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE messages (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id VARCHAR(80) NOT NULL DEFAULT '',          -- 由收发双方用户 ID 排序拼接，如 a_id_b_id
+  sender_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  receiver_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  post_id         UUID REFERENCES posts(id) ON DELETE SET NULL,  -- TEXT 类型消息为空
+  text            TEXT NOT NULL DEFAULT '',
+  is_read         BOOLEAN NOT NULL DEFAULT false,
+  type            VARCHAR(10) NOT NULL DEFAULT 'TEXT',           -- TEXT / POST / COMMENT
+  created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 会话查询按「收发双方 + 时间」过滤排序
+CREATE INDEX idx_messages_conversation
+  ON messages (sender_id, receiver_id, created_at);
+
+-- 按 conversation_id 聚合/查询会话时命中
+CREATE INDEX idx_messages_conversation_id
+  ON messages (conversation_id, created_at);
 ```
 
 > **注：** 收藏关系只记录在帖子侧。`posts.favourite`（收藏该帖的用户 ID 列表）列由服务启动时的 `initDatabase()` 通过幂等 `ALTER TABLE posts ADD COLUMN IF NOT EXISTS favourite JSONB DEFAULT '[]'::jsonb` 自动补齐，并像 `followers`/`fans`/`likes` 一样把历史遗留的**非数组**脏数据统一纠正为空数组 `[]`。历史版本的 `users.favorites` 列（用户收藏的帖子 ID 数组）已在 `initDatabase()` 中做一次性回填：把旧收藏数据镜像写入对应帖子的 `favourite` 后删除该列，用户资料不再含任何收藏字段。上面给出的 DDL 为最终结构。

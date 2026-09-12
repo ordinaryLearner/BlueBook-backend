@@ -165,6 +165,47 @@ const initDatabase = async () => {
     await cleanNonArrayColumns('users', 'fans');
     await cleanNonArrayColumns('posts', 'favourite');
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id VARCHAR(80) NOT NULL DEFAULT '',
+        sender_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        receiver_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        post_id         UUID REFERENCES posts(id) ON DELETE SET NULL,
+        text            TEXT NOT NULL DEFAULT '',
+        is_read         BOOLEAN NOT NULL DEFAULT false,
+        type            VARCHAR(10) NOT NULL DEFAULT 'TEXT',
+        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 兼容已存在的表：幂等补充会话 ID 列，由收发双方用户 ID 排序后拼接待入
+    await pool.query(`
+      ALTER TABLE messages
+      ADD COLUMN IF NOT EXISTS conversation_id VARCHAR(80) NOT NULL DEFAULT ''
+    `);
+
+    // 历史数据回填：按 sender_id/receiver_id 升序拼接生成 conversation_id（uuid::text 本身有序）
+    await pool.query(`
+      UPDATE messages
+      SET conversation_id = LEAST(sender_id::text, receiver_id::text)
+                            || '_' ||
+                            GREATEST(sender_id::text, receiver_id::text)
+      WHERE conversation_id = ''
+    `);
+
+    // 会话查询按「收发双方 + 时间」过滤并排序，建复合索引避免全表扫描
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_messages_conversation
+      ON messages (sender_id, receiver_id, created_at)
+    `);
+
+    // 会话 ID 索引：按会话聚合/分页时直接命中
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_messages_conversation_id
+      ON messages (conversation_id, created_at)
+    `);
+
     console.log('Database tables initialized successfully');
   } catch (error) {
     console.error('Database initialization failed:', error.message);

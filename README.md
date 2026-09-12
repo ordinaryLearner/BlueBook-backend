@@ -2124,6 +2124,57 @@ Authorization: Bearer <token>
 - 返回的 `isRead` 字段为 `true`（因为已随本次返回置为已读），客户端可据此直接更新本地状态。
 - 该接口与 `18.2 标记会话已读` 的区别：18.2 是按某个会话批量清除未读，本接口是不区分会话、一次性取走全部未读。
 
+---
+
+### 18.4 由用户 ID 获取会话 ID
+
+```
+POST /api/messages/conversation-id
+Content-Type: application/json
+```
+
+公开接口（无需登录，纯计算，不涉及任何用户数据）。客户端上传两个用户 ID，服务端按与发送消息时**完全相同的规则**推导并返回 `conversationId`，便于客户端在本地聚合会话（例如根据会话 ID 分组聊天列表），无需等待消息返回。
+
+**Request Body（JSON）：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userId` | string | 是 | 用户 ID（会话的一方） |
+| `otherId` | string | 是 | 对方用户 ID（也可用 `targetId` 或 `receiverId` / `receiver.id` 传入） |
+
+示例：
+
+```json
+{
+  "userId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+  "otherId": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
+}
+```
+
+**Response `200`：**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "conversationId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d_b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e"
+  }
+}
+```
+
+**错误码：**
+
+| 状态码 | code | message |
+|--------|------|---------|
+| 400 | 400 | 用户ID(userId)不能为空 |
+| 400 | 400 | 对方用户ID(otherId)不能为空 |
+| 400 | 400 | 用户ID(userId)格式不正确 |
+| 400 | 400 | 对方用户ID(otherId)格式不正确 |
+| 500 | 500 | 获取会话ID失败 |
+
+**说明：** 推导规则同 `18` 节：两个用户 ID 转小写后按字典序排序，用 `_` 连接。由于规则对称，传入顺序不影响结果——`(A, B)` 与 `(B, A)` 返回同一个 `conversationId`，且与 `18` 节发送消息时服务端写入的值一致。该接口只做格式校验，不校验用户是否存在。
+
 ## 图片存储说明
 
 当前版本**不存储图片文件**，也不经过任何图床服务。客户端直接将图片的 URL（URI）数组随发布请求一起提交，后端只把这些 URL 原样存入 `post_medias` 表的 `url` 字段。

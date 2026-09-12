@@ -2,6 +2,7 @@
 const {
   MESSAGE_TYPE,
   UUID_RE,
+  buildConversationId,
   createMessage,
   findConversation,
   markConversationRead,
@@ -126,6 +127,40 @@ exports.takeUnread = async (req, res) => {
   } catch (error) {
     console.error('获取未读消息错误:', error);
     res.status(500).json({ code: 500, message: '获取未读消息失败' });
+  }
+};
+
+// 由客户端上传的两个用户 ID 推导会话 ID（排序拼接），供客户端本地聚合会话使用
+exports.getConversationId = async (req, res) => {
+  try {
+    const body = req.body || {};
+    const userId = typeof body.userId === 'string' ? body.userId.trim() : '';
+    const otherId = (typeof body.otherId === 'string' ? body.otherId.trim() : '')
+      || (typeof body.targetId === 'string' ? body.targetId.trim() : '')
+      || extractReceiverId(body);
+
+    if (!userId) {
+      return res.status(400).json({ code: 400, message: '用户ID(userId)不能为空' });
+    }
+    if (!otherId) {
+      return res.status(400).json({ code: 400, message: '对方用户ID(otherId)不能为空' });
+    }
+    if (!UUID_RE.test(userId)) {
+      return res.status(400).json({ code: 400, message: '用户ID(userId)格式不正确' });
+    }
+    if (!UUID_RE.test(otherId)) {
+      return res.status(400).json({ code: 400, message: '对方用户ID(otherId)格式不正确' });
+    }
+
+    const conversationId = buildConversationId(userId, otherId);
+    res.json({
+      code: 200,
+      message: 'success',
+      data: { conversationId }
+    });
+  } catch (error) {
+    console.error('获取会话ID错误:', error);
+    res.status(500).json({ code: 500, message: '获取会话ID失败' });
   }
 };
 
